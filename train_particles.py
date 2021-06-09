@@ -18,8 +18,9 @@ import spatial_vae.mrc as mrc
 import spatial_vae.image as image_utils
 import spatial_vae.ctf as C
 
-def eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi
-                  , augment_rotation=False, z_scale=1, use_cuda=False):
+
+def eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
+                   augment_rotation=False, z_scale=1, use_cuda=False):
     b = y.size(0)
     x = x.expand(b, x.size(0), x.size(1))
     n = int(np.sqrt(y.size(1)))
@@ -36,7 +37,7 @@ def eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=True, translate=True, d
             r = np.random.binomial(1, p=rotate, size=b)
             offset *= r
         for i in range(b):
-            im = Image.fromarray(y[i].view(n,n).cpu().numpy())
+            im = Image.fromarray(y[i].view(n, n).cpu().numpy())
             im = im.rotate(360*offset[i]/2/np.pi, resample=Image.BICUBIC)
             im = torch.from_numpy(np.array(im, copy=False)).to(y.device)
             y_rot[i] = im.view(-1)
@@ -46,54 +47,54 @@ def eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=True, translate=True, d
         y_rot = y_rot.cuda()
 
     # first do inference on the latent variables
-    z_mu,z_logstd = q_net(y_rot)
+    z_mu, z_logstd = q_net(y_rot)
     z_std = torch.exp(z_logstd)
     z_dim = z_mu.size(1)
 
     # draw samples from variational posterior to calculate
     # E[p(x|z)]
-    r = Variable(x.data.new(b,z_dim).normal_())
+    r = Variable(x.data.new(b, z_dim).normal_())
     z = z_std*r + z_mu
     
     kl_div = 0
     if rotate:
         # z[0] is the rotation
-        theta_mu = z_mu[:,0]
-        theta_std = z_std[:,0]
-        theta_logstd = z_logstd[:,0]
-        theta = z[:,0]
-        z = z[:,1:]
-        z_mu = z_mu[:,1:]
-        z_std = z_std[:,1:]
-        z_logstd = z_logstd[:,1:]
+        theta_mu = z_mu[:, 0]
+        theta_std = z_std[:, 0]
+        theta_logstd = z_logstd[:, 0]
+        theta = z[:, 0]
+        z = z[:, 1:]
+        z_mu = z_mu[:, 1:]
+        z_std = z_std[:, 1:]
+        z_logstd = z_logstd[:, 1:]
 
         if np.any(offset > 0):
-            # invert the random rotation to reconstruct original with rotaion offset
+            # invert the random rotation to reconstruct original with rotation offset
             offset = torch.from_numpy(offset).float().to(z.device)
             theta = theta + offset
 
         # calculate rotation matrix
-        rot = Variable(theta.data.new(b,2,2).zero_())
-        rot[:,0,0] = torch.cos(theta)
-        rot[:,0,1] = torch.sin(theta)
-        rot[:,1,0] = -torch.sin(theta)
-        rot[:,1,1] = torch.cos(theta)
-        x = torch.bmm(x, rot) # rotate coordinates by theta
+        rot = Variable(theta.data.new(b, 2, 2).zero_())
+        rot[:, 0, 0] = torch.cos(theta)
+        rot[:, 0, 1] = torch.sin(theta)
+        rot[:, 1, 0] = -torch.sin(theta)
+        rot[:, 1, 1] = torch.cos(theta)
+        x = torch.bmm(x, rot)  # rotate coordinates by theta
 
         # use modified KL for rotation with no penalty on mean
         sigma = theta_prior
         kl_div = -theta_logstd + np.log(sigma) + theta_std**2/2/sigma**2 - 0.5
 
     if translate:
-        # z[0,1] are the translations
-        dx_mu = z_mu[:,:2]
-        dx_std = z_std[:,:2]
-        dx_logstd = z_logstd[:,:2]
-        dx = z[:,:2]*dx_scale # scale dx by standard deviation
+        # z[0, 1] are the translations
+        dx_mu = z_mu[:, :2]
+        dx_std = z_std[:, :2]
+        dx_logstd = z_logstd[:, :2]
+        dx = z[:, :2]*dx_scale  # scale dx by standard deviation
         dx = dx.unsqueeze(1)
-        z = z[:,2:]
+        z = z[:, 2:]
 
-        x = x + dx # translate coordinates
+        x = x + dx  # translate coordinates
 
     z = z*z_scale
 
@@ -104,17 +105,17 @@ def eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=True, translate=True, d
     y_var = None
 
     if y_params.size(1) > y.size(1):
-        y_mu = y_params[:,:y.size(1)]
-        y_logvar = y_params[:,y.size(1):]
+        y_mu = y_params[:, :y.size(1)]
+        y_logvar = y_params[:, y.size(1):]
         y_var = torch.exp(y_logvar)
 
     if ctf is not None: # apply the CTF filter
         pad = ctf.size(2)//2
         y_mu = y_mu.view(1, -1, n, n)
-        #print(ctf.size(), y_mu.size(), file=sys.stderr)
+        # print(ctf.size(), y_mu.size(), file=sys.stderr)
 
         y_mu = F.conv2d(y_mu, ctf, padding=pad, groups=ctf.size(0))
-        #print(y_mu.size(), file=sys.stderr)
+        # print(y_mu.size(), file=sys.stderr)
         y_mu = y_mu.view(-1, n*n)
 
         if y_var is not None:
@@ -124,13 +125,13 @@ def eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=True, translate=True, d
 
     y = y.view(-1, n*n)
     if mask is not None:
-        y = y[:,mask]
-        y_mu = y_mu[:,mask]
+        y = y[:, mask]
+        y_mu = y_mu[:, mask]
         if y_var is not None:
-            y_var = y_var[:,mask]
-            y_logvar = y_logvar[:,mask]
+            y_var = y_var[:, mask]
+            y_logvar = y_logvar[:, mask]
 
-    #print(y.size(), y_mu.size(), file=sys.stderr)
+    # print(y.size(), y_mu.size(), file=sys.stderr)
 
     if y_var is not None:
         log_p_x_g_z = -0.5*torch.sum((y_mu - y)**2/y_var + y_logvar, 1).mean()
@@ -147,9 +148,9 @@ def eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=True, translate=True, d
     return elbo, log_p_x_g_z, kl_div
 
 
-def train_epoch(iterator, x_coord, mask, p_net, q_net, optim, rotate=True, translate=True
-               , dx_scale=0.1, theta_prior=np.pi, augment_rotation=False, z_scale=1
-               , epoch=1, num_epochs=1, N=1, use_cuda=False):
+def train_epoch(iterator, x_coord, mask, p_net, q_net, optim, rotate=True, translate=True,
+                dx_scale=0.1, theta_prior=np.pi, augment_rotation=False, z_scale=1,
+                epoch=1, num_epochs=1, N=1, use_cuda=False):
     p_net.train()
     q_net.train()
 
@@ -160,7 +161,7 @@ def train_epoch(iterator, x_coord, mask, p_net, q_net, optim, rotate=True, trans
 
     for mb in iterator:
         if len(mb) > 1:
-            y,ctf = mb
+            y, ctf = mb
         else:
             y = mb[0]
             ctf = None
@@ -169,10 +170,10 @@ def train_epoch(iterator, x_coord, mask, p_net, q_net, optim, rotate=True, trans
         x = Variable(x_coord)
         y = Variable(y)
 
-        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=rotate, translate=translate
-                                                  , dx_scale=dx_scale, theta_prior=theta_prior
-                                                  , augment_rotation=augment_rotation, z_scale=z_scale
-                                                  , use_cuda=use_cuda)
+        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=rotate, translate=translate,
+                                                   dx_scale=dx_scale, theta_prior=theta_prior,
+                                                   augment_rotation=augment_rotation, z_scale=z_scale,
+                                                   use_cuda=use_cuda)
 
         loss = -elbo
         loss.backward()
@@ -194,16 +195,15 @@ def train_epoch(iterator, x_coord, mask, p_net, q_net, optim, rotate=True, trans
         kl_loss_accum += delta/c
 
         template = '# [{}/{}] training {:.1%}, ELBO={:.5f}, Error={:.5f}, KL={:.5f}'
-        line = template.format(epoch+1, num_epochs, c/N, elbo_accum, gen_loss_accum
-                              , kl_loss_accum)
+        line = template.format(epoch+1, num_epochs, c/N, elbo_accum, gen_loss_accum, kl_loss_accum)
         print(line, end='\r', file=sys.stderr)
 
     print(' '*80, end='\r', file=sys.stderr)
     return elbo_accum, gen_loss_accum, kl_loss_accum
 
 
-def eval_model(iterator, x_coord, mask, p_net, q_net, rotate=True, translate=True
-              , dx_scale=0.1, theta_prior=np.pi, z_scale=1, use_cuda=False):
+def eval_model(iterator, x_coord, mask, p_net, q_net, rotate=True, translate=True,
+               dx_scale=0.1, theta_prior=np.pi, z_scale=1, use_cuda=False):
     p_net.eval()
     q_net.eval()
 
@@ -214,7 +214,7 @@ def eval_model(iterator, x_coord, mask, p_net, q_net, rotate=True, translate=Tru
 
     for mb in iterator:
         if len(mb) > 1:
-            y,ctf = mb
+            y, ctf = mb
         else:
             y = mb[0]
             ctf = None
@@ -223,10 +223,10 @@ def eval_model(iterator, x_coord, mask, p_net, q_net, rotate=True, translate=Tru
         x = Variable(x_coord)
         y = Variable(y)
 
-        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=rotate, translate=translate
-                                                  , dx_scale=dx_scale, theta_prior=theta_prior
-                                                  , z_scale=z_scale
-                                                  , use_cuda=use_cuda)
+        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, mask, ctf, p_net, q_net, rotate=rotate, translate=translate,
+                                                   dx_scale=dx_scale, theta_prior=theta_prior,
+                                                   z_scale=z_scale,
+                                                   use_cuda=use_cuda)
 
         elbo = elbo.item()
         gen_loss = -log_p_x_g_z.item()
@@ -249,7 +249,7 @@ def load_images(path):
     if path.endswith('mrc') or path.endswith('mrcs'):
         with open(path, 'rb') as f:
             content = f.read()
-        images,_,_ = mrc.parse(content)
+        images, _, _ = mrc.parse(content)
     elif path.endswith('npy'):
         images = np.load(path)
     return images
@@ -322,7 +322,7 @@ def main():
 
     digits = int(np.log10(num_epochs)) + 1
 
-    ## load the images
+    # load the images
     images_train = load_images(args.train_path)
     images_test = load_images(args.test_path)
     print('# train:', images_train.shape, ', test:', images_test.shape, file=sys.stderr)
@@ -333,22 +333,22 @@ def main():
         images_test = image_utils.crop(images_test, crop)
         print('# cropped to:', crop, file=sys.stderr)
 
-    n,m = images_train.shape[1:]
+    n, m = images_train.shape[1:]
 
     # normalize the images using edges to estimate background
     if args.normalize:
         print('# normalizing particles', file=sys.stderr)
         mu = images_train.reshape(-1, n*m).mean(1)
         std = images_train.reshape(-1, n*m).std(1)
-        images_train = (images_train - mu[:,np.newaxis,np.newaxis])/std[:,np.newaxis,np.newaxis]
+        images_train = (images_train - mu[:, np.newaxis, np.newaxis])/std[:, np.newaxis, np.newaxis]
 
         mu = images_test.reshape(-1, n*m).mean(1)
         std = images_test.reshape(-1, n*m).std(1)
-        images_test = (images_test - mu[:,np.newaxis,np.newaxis])/std[:,np.newaxis,np.newaxis]
+        images_test = (images_test - mu[:, np.newaxis, np.newaxis])/std[:, np.newaxis, np.newaxis]
 
-        #radius = min(n,m)/2
-        #images_train = image_utils.normalize(images_train, radius)
-        #images_test = image_utils.normalize(images_test, radius)
+        # radius = min(n, m)/2
+        # images_train = image_utils.normalize(images_train, radius)
+        # images_test = image_utils.normalize(images_test, radius)
 
     scale = args.scale
     ctf_train = None
@@ -370,12 +370,12 @@ def main():
         ctf_test = C.ctf_filter(ctf_params, n, m, scale=scale)
         ctf_test = torch.from_numpy(ctf_test).float().unsqueeze(1)
 
-    n,m = images_train.shape[1:]
+    n, m = images_train.shape[1:]
 
-    ## x coordinate array
+    # x coordinate array
     xgrid = np.linspace(-1, 1, m)
     ygrid = np.linspace(1, -1, n)
-    x0,x1 = np.meshgrid(xgrid, ygrid)
+    x0, x1 = np.meshgrid(xgrid, ygrid)
     x_coord = np.stack([x0.ravel(), x1.ravel()], 1)
     x_coord = torch.from_numpy(x_coord).float()
 
@@ -387,15 +387,15 @@ def main():
     mask = None
     if args.mask:
         print('# masking particles', file=sys.stderr)
-        radius = min(n,m)/2
-        y_grid, x_grid = np.ogrid[:n,:m]
+        radius = min(n, m)/2
+        y_grid, x_grid = np.ogrid[:n, :m]
         center = np.array([n/2, m/2])
         dist = np.sqrt((center[0] - y_grid)**2 + (center[1] - x_grid)**2)
         mask = torch.from_numpy(dist) < radius
         mask = mask.view(-1)
         print('# masking to size:', mask.sum().item(), file=sys.stderr)
 
-    ## set the device
+    # set the device
     d = args.device
     use_cuda = (d != -1) and torch.cuda.is_available()
     if d >= 0:
@@ -445,8 +445,8 @@ def main():
     softplus = args.softplus
     if args.vanilla:
         print('# using the vanilla MLP generator architecture', file=sys.stderr)
-        p_net = models.VanillaGenerator(n*m, z_dim, hidden_dim, n_out=n_out, num_layers=num_layers
-                                       , activation=activation, softplus=softplus, resid=resid)
+        p_net = models.VanillaGenerator(n*m, z_dim, hidden_dim, n_out=n_out, num_layers=num_layers,
+                                        activation=activation, softplus=softplus, resid=resid)
         inf_dim = z_dim
         rotate = False
         translate = False
@@ -461,14 +461,13 @@ def main():
         if translate:
             print('# spatial-VAE with translation inference', file=sys.stderr)
             inf_dim += 2
-        p_net = models.SpatialGenerator(z_dim, hidden_dim, n_out=n_out, num_layers=num_layers
-                                       , activation=activation, softplus=softplus, resid=resid
-                                       , expand_coords=expand_coords, bilinear=bilinear)
+        p_net = models.SpatialGenerator(z_dim, hidden_dim, n_out=n_out, num_layers=num_layers,
+                                        activation=activation, softplus=softplus, resid=resid,
+                                        expand_coords=expand_coords, bilinear=bilinear)
 
     num_layers = args.q_num_layers
     hidden_dim = args.q_hidden_dim
-    q_net = models.InferenceNetwork(n*m, inf_dim, hidden_dim, num_layers=num_layers
-                                   , activation=activation, resid=resid)
+    q_net = models.InferenceNetwork(n*m, inf_dim, hidden_dim, num_layers=num_layers, activation=activation, resid=resid)
 
     if use_cuda:
         p_net.cuda()
@@ -484,8 +483,8 @@ def main():
 
     lr = args.learning_rate
     optim = torch.optim.Adam(params, lr=lr)
-    #optim = torch.optim.Adagrad(params, lr=lr)
-    #optim = torch.optim.SGD(params, lr=lr, momentum=0.9)
+    # optim = torch.optim.Adagrad(params, lr=lr)
+    # optim = torch.optim.SGD(params, lr=lr, momentum=0.9)
     minibatch_size = args.minibatch_size
 
     train_iterator = torch.utils.data.DataLoader(data_train, batch_size=minibatch_size,
@@ -504,32 +503,31 @@ def main():
         if epoch < z_delay:
             z_scale = 0
 
-        elbo_accum,gen_loss_accum,kl_loss_accum = train_epoch(train_iterator, x_coord, mask, p_net, q_net,
-                                                              optim, rotate=rotate, translate=translate,
-                                                              dx_scale=dx_scale, theta_prior=theta_prior,
-                                                              augment_rotation=augment_rotation,
-                                                              z_scale=z_scale,
-                                                              epoch=epoch, num_epochs=num_epochs, N=N,
-                                                              use_cuda=use_cuda)
+        elbo_accum, gen_loss_accum, kl_loss_accum = train_epoch(train_iterator, x_coord, mask, p_net, q_net,
+                                                                optim, rotate=rotate, translate=translate,
+                                                                dx_scale=dx_scale, theta_prior=theta_prior,
+                                                                augment_rotation=augment_rotation,
+                                                                z_scale=z_scale,
+                                                                epoch=epoch, num_epochs=num_epochs, N=N,
+                                                                use_cuda=use_cuda)
 
         line = '\t'.join([str(epoch+1), 'train', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
         print(line, file=output)
         output.flush()
 
         # evaluate on the test set
-        elbo_accum,gen_loss_accum,kl_loss_accum = eval_model(test_iterator, x_coord, mask, p_net,
-                                                             q_net, rotate=rotate, translate=translate,
-                                                             dx_scale=dx_scale, theta_prior=theta_prior,
-                                                             z_scale=z_scale,
-                                                             use_cuda=use_cuda
-                                                            )
+        elbo_accum, gen_loss_accum, kl_loss_accum = eval_model(test_iterator, x_coord, mask, p_net,
+                                                              q_net, rotate=rotate, translate=translate,
+                                                              dx_scale=dx_scale, theta_prior=theta_prior,
+                                                              z_scale=z_scale,
+                                                              use_cuda=use_cuda
+                                                               )
         line = '\t'.join([str(epoch+1), 'test', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
         print(line, file=output)
         output.flush()
 
-
-        ## save the models
-        if path_prefix is not None and (epoch+1)%save_interval == 0:
+        # save the models
+        if path_prefix is not None and (epoch+1) % save_interval == 0:
             epoch_str = str(epoch+1).zfill(digits)
 
             path = path_prefix + '_generator_epoch{}.sav'.format(epoch_str)
@@ -543,7 +541,6 @@ def main():
             if use_cuda:
                 p_net.cuda()
                 q_net.cuda()
-
 
 
 if __name__ == '__main__':

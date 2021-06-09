@@ -15,6 +15,7 @@ import torchvision
 
 import spatial_vae.models as models
 
+
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi, use_cuda=False):
     b = y.size(0)
     x = x.expand(b, x.size(0), x.size(1))
@@ -23,49 +24,49 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     if use_cuda:
         y = y.cuda()
 
-    z_mu,z_logstd = q_net(y)
+    z_mu, z_logstd = q_net(y)
     z_std = torch.exp(z_logstd)
     z_dim = z_mu.size(1)
 
     # draw samples from variational posterior to calculate
     # E[p(x|z)]
-    r = Variable(x.data.new(b,z_dim).normal_())
+    r = Variable(x.data.new(b, z_dim).normal_())
     z = z_std*r + z_mu
     
     kl_div = 0
     if rotate:
         # z[0] is the rotation
-        theta_mu = z_mu[:,0]
-        theta_std = z_std[:,0]
-        theta_logstd = z_logstd[:,0]
-        theta = z[:,0]
-        z = z[:,1:]
-        z_mu = z_mu[:,1:]
-        z_std = z_std[:,1:]
-        z_logstd = z_logstd[:,1:]
+        theta_mu = z_mu[:, 0]
+        theta_std = z_std[:, 0]
+        theta_logstd = z_logstd[:, 0]
+        theta = z[:, 0]
+        z = z[:, 1:]
+        z_mu = z_mu[:, 1:]
+        z_std = z_std[:, 1:]
+        z_logstd = z_logstd[:, 1:]
 
         # calculate rotation matrix
-        rot = Variable(theta.data.new(b,2,2).zero_())
-        rot[:,0,0] = torch.cos(theta)
-        rot[:,0,1] = torch.sin(theta)
-        rot[:,1,0] = -torch.sin(theta)
-        rot[:,1,1] = torch.cos(theta)
-        x = torch.bmm(x, rot) # rotate coordinates by theta
+        rot = Variable(theta.data.new(b, 2, 2).zero_())
+        rot[:, 0, 0] = torch.cos(theta)
+        rot[:, 0, 1] = torch.sin(theta)
+        rot[:, 1, 0] = -torch.sin(theta)
+        rot[:, 1, 1] = torch.cos(theta)
+        x = torch.bmm(x, rot)  # rotate coordinates by theta
 
         # calculate the KL divergence term
         sigma = theta_prior
         kl_div = -theta_logstd + np.log(sigma) + (theta_std**2 + theta_mu**2)/2/sigma**2 - 0.5
 
     if translate:
-        # z[0,1] are the translations
-        dx_mu = z_mu[:,:2]
-        dx_std = z_std[:,:2]
-        dx_logstd = z_logstd[:,:2]
-        dx = z[:,:2]*dx_scale # scale dx by standard deviation
+        # z[0, 1] are the translations
+        dx_mu = z_mu[:, :2]
+        dx_std = z_std[:, :2]
+        dx_logstd = z_logstd[:, :2]
+        dx = z[:, :2]*dx_scale  # scale dx by standard deviation
         dx = dx.unsqueeze(1)
-        z = z[:,2:]
+        z = z[:, 2:]
 
-        x = x + dx # translate coordinates
+        x = x + dx  # translate coordinates
 
     # reconstruct
     y_hat = p_net(x.contiguous(), z)
@@ -83,9 +84,10 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
     return elbo, log_p_x_g_z, kl_div
 
-def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True
-               , dx_scale=0.1, theta_prior=np.pi
-               , epoch=1, num_epochs=1, N=1, use_cuda=False):
+
+def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True,
+                dx_scale=0.1, theta_prior=np.pi,
+                epoch=1, num_epochs=1, N=1, use_cuda=False):
     p_net.train()
     q_net.train()
 
@@ -99,9 +101,9 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         x = Variable(x_coord)
         y = Variable(y)
 
-        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate
-                                                  , dx_scale=dx_scale, theta_prior=theta_prior
-                                                  , use_cuda=use_cuda)
+        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
+                                                   dx_scale=dx_scale, theta_prior=theta_prior,
+                                                   use_cuda=use_cuda)
 
         loss = -elbo
         loss.backward()
@@ -123,16 +125,16 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         kl_loss_accum += delta/c
 
         template = '# [{}/{}] training {:.1%}, ELBO={:.5f}, Error={:.5f}, KL={:.5f}'
-        line = template.format(epoch+1, num_epochs, c/N, elbo_accum, gen_loss_accum
-                              , kl_loss_accum)
+        line = template.format(epoch+1, num_epochs, c/N, elbo_accum, gen_loss_accum,
+                               kl_loss_accum)
         print(line, end='\r', file=sys.stderr)
 
     print(' '*80, end='\r', file=sys.stderr)
     return elbo_accum, gen_loss_accum, kl_loss_accum
 
 
-def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True
-              , dx_scale=0.1, theta_prior=np.pi, use_cuda=False):
+def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
+               dx_scale=0.1, theta_prior=np.pi, use_cuda=False):
     p_net.eval()
     q_net.eval()
 
@@ -146,9 +148,8 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True
         x = Variable(x_coord)
         y = Variable(y)
 
-        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate
-                                                  , dx_scale=dx_scale, theta_prior=theta_prior
-                                                  , use_cuda=use_cuda)
+        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
+                                                   dx_scale=dx_scale, theta_prior=theta_prior, use_cuda=use_cuda)
 
         elbo = elbo.item()
         gen_loss = -log_p_x_g_z.item()
@@ -200,18 +201,18 @@ def main():
 
     digits = int(np.log10(num_epochs)) + 1
 
-    ## load the images
+    # load the images
     if args.dataset == 'mnist':
         print('# training on MNIST', file=sys.stderr)
         mnist_train = torchvision.datasets.MNIST('data/mnist/', train=True, download=True)
         mnist_test = torchvision.datasets.MNIST('data/mnist/', train=False, download=True)
 
-        array = np.zeros((len(mnist_train),28,28), dtype=np.uint8)
+        array = np.zeros((len(mnist_train), 28, 28), dtype=np.uint8)
         for i in range(len(mnist_train)):
             array[i] = np.array(mnist_train[i][0], copy=False)
         mnist_train = array
 
-        array = np.zeros((len(mnist_test),28,28), dtype=np.uint8)
+        array = np.zeros((len(mnist_test), 28, 28), dtype=np.uint8)
         for i in range(len(mnist_test)):
             array[i] = np.array(mnist_test[i][0], copy=False)
         mnist_test = array
@@ -231,17 +232,17 @@ def main():
 
     n = m = 28
 
-    ## x coordinate array
+    # x coordinate array
     xgrid = np.linspace(-1, 1, m)
     ygrid = np.linspace(1, -1, n)
-    x0,x1 = np.meshgrid(xgrid, ygrid)
+    x0, x1 = np.meshgrid(xgrid, ygrid)
     x_coord = np.stack([x0.ravel(), x1.ravel()], 1)
     x_coord = torch.from_numpy(x_coord).float()
 
     y_train = mnist_train.view(-1, n*m)
     y_test = mnist_test.view(-1, n*m)
 
-    ## set the device
+    # # set the device
     d = args.device
     use_cuda = (d != -1) and torch.cuda.is_available()
     if d >= 0:
@@ -317,29 +318,28 @@ def main():
 
     for epoch in range(num_epochs):
 
-        elbo_accum,gen_loss_accum,kl_loss_accum = train_epoch(train_iterator, x_coord, p_net, q_net,
-                                                              optim, rotate=rotate, translate=translate,
-                                                              dx_scale=dx_scale, theta_prior=theta_prior,
-                                                              epoch=epoch, num_epochs=num_epochs, N=N,
-                                                              use_cuda=use_cuda)
+        elbo_accum, gen_loss_accum, kl_loss_accum = train_epoch(train_iterator, x_coord, p_net, q_net,
+                                                                optim, rotate=rotate, translate=translate,
+                                                                dx_scale=dx_scale, theta_prior=theta_prior,
+                                                                epoch=epoch, num_epochs=num_epochs, N=N,
+                                                                use_cuda=use_cuda)
 
         line = '\t'.join([str(epoch+1), 'train', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
         print(line, file=output)
         output.flush()
 
         # evaluate on the test set
-        elbo_accum,gen_loss_accum,kl_loss_accum = eval_model(test_iterator, x_coord, p_net,
-                                                             q_net, rotate=rotate, translate=translate,
-                                                             dx_scale=dx_scale, theta_prior=theta_prior,
-                                                             use_cuda=use_cuda
-                                                            )
+        elbo_accum, gen_loss_accum, kl_loss_accum = eval_model(test_iterator, x_coord, p_net,
+                                                               q_net, rotate=rotate, translate=translate,
+                                                               dx_scale=dx_scale, theta_prior=theta_prior,
+                                                               use_cuda=use_cuda
+                                                               )
         line = '\t'.join([str(epoch+1), 'test', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
         print(line, file=output)
         output.flush()
 
-
-        ## save the models
-        if path_prefix is not None and (epoch+1)%save_interval == 0:
+        # save the models
+        if path_prefix is not None and (epoch+1) % save_interval == 0:
             epoch_str = str(epoch+1).zfill(digits)
 
             path = path_prefix + '_generator_epoch{}.sav'.format(epoch_str)
@@ -353,7 +353,6 @@ def main():
             if use_cuda:
                 p_net.cuda()
                 q_net.cuda()
-
 
 
 if __name__ == '__main__':

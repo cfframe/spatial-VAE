@@ -106,11 +106,11 @@ header_struct = struct.Struct(fstr)
 MRCHeader = namedtuple('MRCHeader', names)
 
 def parse(content):
-    ## parse the header
+    # parse the header
     header = content[0:1024]
     header = MRCHeader._make(header_struct.unpack(content[:1024]))
 
-    ## get the number of bytes in extended header
+    # get the number of bytes in extended header
     extbytes = header.next
     start = 1024+extbytes # start of image data
     extended_header = content[1024:start]
@@ -132,12 +132,13 @@ def parse(content):
         dtype = '3B' # RGB values
 
     array = np.frombuffer(content, dtype=dtype) 
-    ## reshape the array
+    # reshape the array
     array = np.reshape(array, (header.nz, header.ny, header.nx)) # , order='F')
     if header.nz == 1:
         array = array[0]
 
     return array, header, extended_header
+
 
 def get_mode(dtype):
     if dtype == np.int8:
@@ -158,8 +159,8 @@ def get_mode(dtype):
     raise "MRC incompatible dtype: " + str(dtype)
     
 
-def make_header(shape, cella, cellb, mz=1, dtype=np.float32, order=(1,2,3), dmin=0, dmax=-1, dmean=-2, rms=-1
-               , exthd_size=0, ispg=0):
+def make_header(shape, cella, cellb, mz=1, dtype=np.float32, order=(1, 2, 3), dmin=0, dmax=-1, dmean=-2, rms=-1,
+                exthd_size=0, ispg=0):
     mode = get_mode(dtype)
     header = MRCHeader( shape[2], shape[1], shape[0], # nx, ny, nz
                         mode, # mode = 32-bit signed real
@@ -184,31 +185,31 @@ def make_header(shape, cella, cellb, mz=1, dtype=np.float32, order=(1,2,3), dmin
     return header
 
 
-
 def write(f, array, header=None, extended_header=b'', ax=1, ay=1, az=1, alpha=0, beta=0, gamma=0):
     exthd_size = len(extended_header)
     if header is None:
-        header = MRCHeader( array.shape[2], array.shape[1], array.shape[0], # nx, ny, nz
-                            2, # mode = 32-bit signed real
-                            0, 0, 0, # nxstart, nystart, nzstart
-                            1, 1, 1, # mx, my, mz
-                            ax, ay, az, # cella
-                            alpha, beta, gamma, # cellb
-                            1, 2, 3, # mapc, mapr, maps
-                            array.min(), array.max(), array.mean(), # dmin, dmax, dmean
-                            0, # ispg, space group 0 means images or stack of images
-                            exthd_size,
-                            0, # creatid
-                            0, 0, # nint, nreal
-                            0, 0, 0, 0, 0, 0, 0, 0,
-                            0, 0, 0, 0, 0, 0,
-                            0, 0, 0, # xorg, yorg, zorg
-                            b'\x00'*4, b'\x00'*4, #cmap, stamp
-                            array.std(), # rms
-                            0, # nlabl
-                            b'\x00'*800, # labels
-                          )
-    ## write the header
+        header = MRCHeader(
+            array.shape[2], array.shape[1], array.shape[0],  # nx, ny, nz
+            2,  # mode = 32-bit signed real
+            0, 0, 0,  # nxstart, nystart, nzstart
+            1, 1, 1,  # mx, my, mz
+            ax, ay, az,  # cella
+            alpha, beta, gamma,  # cellb
+            1, 2, 3,  # mapc, mapr, maps
+            array.min(), array.max(), array.mean(),  # dmin, dmax, dmean
+            0,  # ispg, space group 0 means images or stack of images
+            exthd_size,
+            0,  # creatid
+            0, 0,  # nint, nreal
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+            0, 0, 0, # xorg, yorg, zorg
+            b'\x00'*4, b'\x00'*4,  # cmap, stamp
+            array.std(),  # rms
+            0,  # nlabl
+            b'\x00'*800,  # labels
+            )
+    # write the header
     buf = header_struct.pack(*list(header))
     f.write(buf)
 

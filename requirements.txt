@@ -1,0 +1,10 @@
+# Assume python>=3.7
+numpy~=1.20.3
+pandas~=1.2.4
+Pillow~=8.2.0
+
+
+# PyTorch
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==1.7.1
+torchvision==0.8.2

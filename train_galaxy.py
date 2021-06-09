@@ -16,8 +16,9 @@ import torchvision
 import spatial_vae.models as models
 import spatial_vae.mrc as mrc
 
-def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi
-                  , augment_rotation=False, z_scale=1, use_cuda=False):
+
+def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
+                   augment_rotation=False, z_scale=1, use_cuda=False):
     b = y.size(0)
     x = x.expand(b, x.size(0), x.size(1))
     n = int(np.sqrt(y.size(1)))
@@ -34,36 +35,36 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
             r = np.random.binomial(1, p=rotate, size=b)
             offset *= r
         for i in range(b):
-            im = Image.fromarray(y[i].view(n,n,3).cpu().numpy())
+            im = Image.fromarray(y[i].view(n, n, 3).cpu().numpy())
             im = im.rotate(360*offset[i]/2/np.pi, resample=Image.BICUBIC)
             im = torch.from_numpy(np.array(im, copy=False)).to(y.device)
-            y_rot[i] = im.view(-1,3)
+            y_rot[i] = im.view(-1, 3)
 
     if use_cuda:
         y = y.cuda()
         y_rot = y_rot.cuda()
 
     # first do inference on the latent variables
-    z_mu,z_logstd = q_net(y_rot.view(b,-1))
+    z_mu, z_logstd = q_net(y_rot.view(b, -1))
     z_std = torch.exp(z_logstd)
     z_dim = z_mu.size(1)
 
     # draw samples from variational posterior to calculate
     # E[p(x|z)]
-    r = Variable(x.data.new(b,z_dim).normal_())
+    r = Variable(x.data.new(b, z_dim).normal_())
     z = z_std*r + z_mu
     
     kl_div = 0
     if rotate:
         # z[0] is the rotation
-        theta_mu = z_mu[:,0]
-        theta_std = z_std[:,0]
-        theta_logstd = z_logstd[:,0]
-        theta = z[:,0]
-        z = z[:,1:]
-        z_mu = z_mu[:,1:]
-        z_std = z_std[:,1:]
-        z_logstd = z_logstd[:,1:]
+        theta_mu = z_mu[:, 0]
+        theta_std = z_std[:, 0]
+        theta_logstd = z_logstd[:, 0]
+        theta = z[:, 0]
+        z = z[:, 1:]
+        z_mu = z_mu[:, 1:]
+        z_std = z_std[:, 1:]
+        z_logstd = z_logstd[:, 1:]
 
         if np.any(offset > 0):
             # invert the random rotation to reconstruct original with rotaion offset
@@ -71,11 +72,11 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
             theta = theta + offset
 
         # calculate rotation matrix
-        rot = Variable(theta.data.new(b,2,2).zero_())
-        rot[:,0,0] = torch.cos(theta)
-        rot[:,0,1] = torch.sin(theta)
-        rot[:,1,0] = -torch.sin(theta)
-        rot[:,1,1] = torch.cos(theta)
+        rot = Variable(theta.data.new(b, 2, 2).zero_())
+        rot[:, 0, 0] = torch.cos(theta)
+        rot[:, 0, 1] = torch.sin(theta)
+        rot[:, 1, 0] = -torch.sin(theta)
+        rot[:, 1, 1] = torch.cos(theta)
         x = torch.bmm(x, rot) # rotate coordinates by theta
 
         # use modified KL for rotation with no penalty on mean
@@ -83,15 +84,15 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
         kl_div = -theta_logstd + np.log(sigma) + theta_std**2/2/sigma**2 - 0.5
 
     if translate:
-        # z[0,1] are the translations
-        dx_mu = z_mu[:,:2]
-        dx_std = z_std[:,:2]
-        dx_logstd = z_logstd[:,:2]
-        dx = z[:,:2]*dx_scale # scale dx by standard deviation
+        # z[0, 1] are the translations
+        dx_mu = z_mu[:, :2]
+        dx_std = z_std[:, :2]
+        dx_logstd = z_logstd[:, :2]
+        dx = z[:, :2]*dx_scale  # scale dx by standard deviation
         dx = dx.unsqueeze(1)
-        z = z[:,2:]
+        z = z[:, 2:]
 
-        x = x + dx # translate coordinates
+        x = x + dx  # translate coordinates
 
     z = z*z_scale
 
@@ -100,7 +101,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     y_hat = y_hat.view(b, -1, 3)
 
     size = y.size(1)*3
-    log_p_x_g_z = -F.binary_cross_entropy_with_logits(y_hat, y)*size
+    log_p_x_g_z = -F.binary_cross_entropy_with_logits(y_hat, y) * size
 
     # unit normal prior over z and translation
     z_kl = -z_logstd + 0.5*z_std**2 + 0.5*z_mu**2 - 0.5
@@ -111,9 +112,10 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
     return elbo, log_p_x_g_z, kl_div
 
-def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True
-               , dx_scale=0.1, theta_prior=np.pi, augment_rotation=False, z_scale=1
-               , epoch=1, num_epochs=1, N=1, use_cuda=False):
+
+def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True,
+                dx_scale=0.1, theta_prior=np.pi, augment_rotation=False, z_scale=1,
+                epoch=1, num_epochs=1, N=1, use_cuda=False):
     p_net.train()
     q_net.train()
 
@@ -127,10 +129,10 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         x = Variable(x_coord)
         y = Variable(y)
 
-        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate
-                                                  , dx_scale=dx_scale, theta_prior=theta_prior
-                                                  , augment_rotation=augment_rotation, z_scale=z_scale
-                                                  , use_cuda=use_cuda)
+        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
+                                                   dx_scale=dx_scale, theta_prior=theta_prior,
+                                                   augment_rotation=augment_rotation, z_scale=z_scale,
+                                                   use_cuda=use_cuda)
 
         loss = -elbo
         loss.backward()
@@ -152,16 +154,15 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         kl_loss_accum += delta/c
 
         template = '# [{}/{}] training {:.1%}, ELBO={:.5f}, Error={:.5f}, KL={:.5f}'
-        line = template.format(epoch+1, num_epochs, c/N, elbo_accum, gen_loss_accum
-                              , kl_loss_accum)
+        line = template.format(epoch+1, num_epochs, c/N, elbo_accum, gen_loss_accum, kl_loss_accum)
         print(line, end='\r', file=sys.stderr)
 
     print(' '*80, end='\r', file=sys.stderr)
     return elbo_accum, gen_loss_accum, kl_loss_accum
 
 
-def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True
-              , dx_scale=0.1, theta_prior=np.pi, z_scale=1, use_cuda=False):
+def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
+               dx_scale=0.1, theta_prior=np.pi, z_scale=1, use_cuda=False):
     p_net.eval()
     q_net.eval()
 
@@ -175,10 +176,9 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True
         x = Variable(x_coord)
         y = Variable(y)
 
-        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate
-                                                  , dx_scale=dx_scale, theta_prior=theta_prior
-                                                  , z_scale=z_scale
-                                                  , use_cuda=use_cuda)
+        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
+                                                   dx_scale=dx_scale, theta_prior=theta_prior,
+                                                   z_scale=z_scale, use_cuda=use_cuda)
 
         elbo = elbo.item()
         gen_loss = -log_p_x_g_z.item()
@@ -201,7 +201,7 @@ def load_images(path):
     if path.endswith('mrc') or path.endswith('mrcs'):
         with open(path, 'rb') as f:
             content = f.read()
-        images,_,_ = mrc.parse(content)
+        images, _, _ = mrc.parse(content)
     elif path.endswith('npy'):
         images = np.load(path)
     return images
@@ -210,7 +210,7 @@ def load_images(path):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser('Train spatial-VAE on particle datasets')
+    parser = argparse.ArgumentParser('Train spatial-VAE on galaxy datasets')
 
     parser.add_argument('train_path', help='path to training data')
     parser.add_argument('test_path', help='path to testing data')
@@ -220,14 +220,18 @@ def main():
     parser.add_argument('--p-num-layers', type=int, default=2, help='number of hidden layers (default: 2)')
     parser.add_argument('--q-hidden-dim', type=int, default=5000, help='dimension of hidden layers (default: 5000)')
     parser.add_argument('--q-num-layers', type=int, default=2, help='number of hidden layers (default: 2)')
-    parser.add_argument('-a', '--activation', choices=['tanh', 'relu'], default='tanh', help='activation function (default: tanh)')
+    parser.add_argument('-a', '--activation', choices=['tanh', 'relu'], default='tanh',
+                        help='activation function (default: tanh)')
 
-    parser.add_argument('--vanilla', action='store_true', help='use the standard MLP generator architecture, decoding each pixel with an independent function. disables structured rotation and translation inference')
+    parser.add_argument('--vanilla', action='store_true',
+                        help='use the standard MLP generator architecture, decoding each pixel with an independent function. disables structured rotation and translation inference')
     parser.add_argument('--no-rotate', action='store_true', help='do not perform rotation inference')
     parser.add_argument('--no-translate', action='store_true', help='do not perform translation inference')
 
-    parser.add_argument('--dx-scale', type=float, default=0.1, help='standard deviation of translation latent variables (default: 0.1)')
-    parser.add_argument('--theta-prior', type=float, default=np.pi, help='standard deviation on rotation prior (default: pi)')
+    parser.add_argument('--dx-scale', type=float, default=0.1,
+                        help='standard deviation of translation latent variables (default: 0.1)')
+    parser.add_argument('--theta-prior', type=float, default=np.pi,
+                        help='standard deviation on rotation prior (default: pi)')
 
     parser.add_argument('-l', '--learning-rate', type=float, default=1e-4, help='learning rate (default: 0.0001)')
     parser.add_argument('--minibatch-size', type=int, default=100, help='minibatch size (default: 100)')
@@ -240,23 +244,35 @@ def main():
     parser.add_argument('--num-epochs', type=int, default=100, help='number of training epochs (default: 100)')
 
     parser.add_argument('-d', '--device', type=int, default=-2, help='compute device to use')
+    parser.add_argument('--num-train-images', type=int, default=0, help='number of training images (default: 0 = all)')
+    parser.add_argument('--num-val-images', type=int, default=0, help='number of validation images (default: 0 = all)')
 
     args = parser.parse_args()
     num_epochs = args.num_epochs
+    num_train_images = args.num_train_images
+    num_val_images = args.num_val_images
 
     digits = int(np.log10(num_epochs)) + 1
 
-    ## load the images
+    # load the images
     print('# loading data...', file=sys.stderr)
     images_train = np.load(args.train_path)
     images_test = np.load(args.test_path)
 
-    n,m = images_train.shape[1:3]
+    # cff Add-in to enable a quick litmus test
+    if num_train_images > 0:
+        np.random.shuffle(images_train)
+        images_train = images_train[:num_train_images]
+    if num_val_images > 0:
+        np.random.shuffle(images_test)
+        images_test = images_test[:num_val_images]
 
-    ## x coordinate array
+    n, m = images_train.shape[1:3]
+
+    # x coordinate array
     xgrid = np.linspace(-1, 1, m)
     ygrid = np.linspace(1, -1, n)
-    x0,x1 = np.meshgrid(xgrid, ygrid)
+    x0, x1 = np.meshgrid(xgrid, ygrid)
     x_coord = np.stack([x0.ravel(), x1.ravel()], 1)
     x_coord = torch.from_numpy(x_coord).float()
 
@@ -265,7 +281,7 @@ def main():
     y_train = images_train.view(-1, n*m, 3)
     y_test = images_test.view(-1, n*m, 3)
 
-    ## set the device
+    # # set the device
     d = args.device
     use_cuda = (d != -1) and torch.cuda.is_available()
     if d >= 0:
@@ -346,32 +362,31 @@ def main():
         if epoch < z_delay:
             z_scale = 0
 
-        elbo_accum,gen_loss_accum,kl_loss_accum = train_epoch(train_iterator, x_coord, p_net, q_net,
-                                                              optim, rotate=rotate, translate=translate,
-                                                              dx_scale=dx_scale, theta_prior=theta_prior,
-                                                              augment_rotation=augment_rotation,
-                                                              z_scale=z_scale,
-                                                              epoch=epoch, num_epochs=num_epochs, N=N,
-                                                              use_cuda=use_cuda)
+        elbo_accum, gen_loss_accum, kl_loss_accum = train_epoch(train_iterator, x_coord, p_net, q_net,
+                                                                optim, rotate=rotate, translate=translate,
+                                                                dx_scale=dx_scale, theta_prior=theta_prior,
+                                                                augment_rotation=augment_rotation,
+                                                                z_scale=z_scale,
+                                                                epoch=epoch, num_epochs=num_epochs, N=N,
+                                                                use_cuda=use_cuda)
 
         line = '\t'.join([str(epoch+1), 'train', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
         print(line, file=output)
         output.flush()
 
         # evaluate on the test set
-        elbo_accum,gen_loss_accum,kl_loss_accum = eval_model(test_iterator, x_coord, p_net,
-                                                             q_net, rotate=rotate, translate=translate,
-                                                             dx_scale=dx_scale, theta_prior=theta_prior,
-                                                             z_scale=z_scale,
-                                                             use_cuda=use_cuda
-                                                            )
-        line = '\t'.join([str(epoch+1), 'test', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
+        elbo_accum, gen_loss_accum, kl_loss_accum = eval_model(test_iterator, x_coord, p_net,
+                                                               q_net, rotate=rotate, translate=translate,
+                                                               dx_scale=dx_scale, theta_prior=theta_prior,
+                                                               z_scale=z_scale,
+                                                               use_cuda=use_cuda
+                                                               )
+        line = '\t'.join([str(epoch+1), 'validation', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
         print(line, file=output)
         output.flush()
 
-
-        ## save the models
-        if path_prefix is not None and (epoch+1)%save_interval == 0:
+        # save the models
+        if path_prefix is not None and (epoch+1) % save_interval == 0:
             epoch_str = str(epoch+1).zfill(digits)
 
             path = path_prefix + '_generator_epoch{}.sav'.format(epoch_str)
@@ -385,7 +400,6 @@ def main():
             if use_cuda:
                 p_net.cuda()
                 q_net.cuda()
-
 
 
 if __name__ == '__main__':
