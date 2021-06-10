@@ -245,27 +245,32 @@ def main():
 
     parser.add_argument('-d', '--device', type=int, default=-2, help='compute device to use')
     parser.add_argument('--num-train-images', type=int, default=0, help='number of training images (default: 0 = all)')
-    parser.add_argument('--num-val-images', type=int, default=0, help='number of validation images (default: 0 = all)')
+    parser.add_argument('--val-split', type=int, default=50, help='% split of images for validation (default: 50)')
 
     args = parser.parse_args()
     num_epochs = args.num_epochs
     num_train_images = args.num_train_images
-    num_val_images = args.num_val_images
+    # num_test_images = args.num_val_images
+    val_split = args.val_split
 
     digits = int(np.log10(num_epochs)) + 1
 
     # load the images
     print('# loading data...', file=sys.stderr)
     images_train = np.load(args.train_path)
-    images_test = np.load(args.test_path)
+    # images_test = np.load(args.test_path)
 
     # cff Add-in to enable a quick litmus test
+    np.random.shuffle(images_train)
     if num_train_images > 0:
-        np.random.shuffle(images_train)
         images_train = images_train[:num_train_images]
-    if num_val_images > 0:
-        np.random.shuffle(images_test)
-        images_test = images_test[:num_val_images]
+
+    num_val_images = int(val_split * len(images_train) / 100)
+    images_val = images_train[:num_val_images]
+    images_train = images_train[num_val_images:]
+    # cff if num_test_images > 0:
+    #     np.random.shuffle(images_test)
+    #     images_test = images_test[:num_test_images]
 
     n, m = images_train.shape[1:3]
 
@@ -277,9 +282,9 @@ def main():
     x_coord = torch.from_numpy(x_coord).float()
 
     images_train = torch.from_numpy(images_train).float()/255
-    images_test = torch.from_numpy(images_test).float()/255
+    images_val = torch.from_numpy(images_val).float()/255
     y_train = images_train.view(-1, n*m, 3)
-    y_test = images_test.view(-1, n*m, 3)
+    y_val = images_val.view(-1, n*m, 3)
 
     # # set the device
     d = args.device
@@ -293,7 +298,7 @@ def main():
         x_coord = x_coord.cuda()
 
     data_train = torch.utils.data.TensorDataset(y_train)
-    data_test = torch.utils.data.TensorDataset(y_test)
+    data_val = torch.utils.data.TensorDataset(y_val)
 
     z_dim = args.z_dim
     print('# training with z-dim:', z_dim, file=sys.stderr)
@@ -348,7 +353,7 @@ def main():
 
     train_iterator = torch.utils.data.DataLoader(data_train, batch_size=minibatch_size,
                                                  shuffle=True)
-    test_iterator = torch.utils.data.DataLoader(data_test, batch_size=minibatch_size)
+    test_iterator = torch.utils.data.DataLoader(data_val, batch_size=minibatch_size)
 
     output = sys.stdout
     print('\t'.join(['Epoch', 'Split', 'ELBO', 'Error', 'KL']), file=output)
