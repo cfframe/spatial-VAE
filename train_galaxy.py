@@ -15,31 +15,29 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.utils.data
-import torchvision
 from torchvision.utils import save_image
 
-from tqdm import tqdm
 
 
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
                    augment_rotation=False, z_scale=1, use_cuda=False):
 
-    b = y.size(0)
-    x = x.expand(b, x.size(0), x.size(1))
+    batch_size = y.size(0)
+    x = x.expand(batch_size, x.size(0), x.size(1))
     n = int(np.sqrt(y.size(1)))
 
     # augment training by randomly rotating images by offset
-    offset = np.zeros(b)
+    offset = np.zeros(batch_size)
     y_rot = y
     if rotate and augment_rotation:
         # in order to encourage robustness of the inference network
         # randomly rotate the observed image before doing inference
         y_rot = y.clone()
-        offset = np.random.uniform(0, 2*np.pi, size=b)
+        offset = np.random.uniform(0, 2*np.pi, size=batch_size)
         if rotate < 1:
-            r = np.random.binomial(1, p=rotate, size=b)
+            r = np.random.binomial(1, p=rotate, size=batch_size)
             offset *= r
-        for i in range(b):
+        for i in range(batch_size):
             im = Image.fromarray(y[i].view(n, n, 3).cpu().numpy())
             im = im.rotate(360*offset[i]/2/np.pi, resample=Image.BICUBIC)
             im = torch.from_numpy(np.array(im, copy=False)).to(y.device)
@@ -50,13 +48,13 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
         y_rot = y_rot.cuda()
 
     # first do inference on the latent variables
-    z_mu, z_logstd = q_net(y_rot.view(b, -1))
+    z_mu, z_logstd = q_net(y_rot.view(batch_size, -1))
     z_std = torch.exp(z_logstd)
     z_dim = z_mu.size(1)
 
     # draw samples from variational posterior to calculate
     # E[p(x|z)]
-    r = Variable(x.data.new(b, z_dim).normal_())
+    r = Variable(x.data.new(batch_size, z_dim).normal_())
     z = z_std*r + z_mu
     
     kl_div = 0
@@ -77,12 +75,12 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
             theta = theta + offset
 
         # calculate rotation matrix
-        rot = Variable(theta.data.new(b, 2, 2).zero_())
+        rot = Variable(theta.data.new(batch_size, 2, 2).zero_())
         rot[:, 0, 0] = torch.cos(theta)
         rot[:, 0, 1] = torch.sin(theta)
         rot[:, 1, 0] = -torch.sin(theta)
         rot[:, 1, 1] = torch.cos(theta)
-        x = torch.bmm(x, rot) # rotate coordinates by theta
+        x = torch.bmm(x, rot)  # rotate coordinates by theta
 
         # use modified KL for rotation with no penalty on mean
         sigma = theta_prior
@@ -103,7 +101,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
     # reconstruct
     y_hat = p_net(x.contiguous(), z)
-    y_hat = y_hat.view(b, -1, 3)
+    y_hat = y_hat.view(batch_size, -1, 3)
 
     size = y.size(1)*3
     log_p_x_g_z = -F.binary_cross_entropy_with_logits(y_hat, y) * size
@@ -208,7 +206,7 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
         # Reconstruct and save images in first batch of each epoch, as a sample
         if iteration_count == 0 and to_save_image_samples and image_dims:
             export_batch_as_image(data=y_hat, output='outputs/images/{}_output.png'.format(epoch),
-                                  image_dims=image_dims)
+                                  image_dims=image_dims, to_permute_for_channels=True)
 
     return elbo_accum, gen_loss_accum, kl_loss_accum
 
@@ -223,11 +221,11 @@ def load_images(path):
     return images
 
 
-def export_batch_as_image(data, output, image_dims):
-    # Re-cast data view
+def export_batch_as_image(data, output, image_dims, to_permute_for_channels=True):
+    # Re-cast data view to original image dimensions
     images = data.view(data.size()[0], *image_dims, -1)
-    images = images.permute(0, 3, 1, 2)
-    # need torch.cat?
+    if to_permute_for_channels:
+        images = images.permute(0, 3, 1, 2)
     # Assume square of images, so no. of rows is square root of number of images
     rows = int(data.size()[0] ** 0.5)
     save_image(images.cpu(), output, nrow=rows)
@@ -235,7 +233,8 @@ def export_batch_as_image(data, output, image_dims):
 
 def sample_images(iterator, image_dims=None, name='sample', prefix=''):
     for y, in iterator:
-        export_batch_as_image(data=y, output='outputs/images/{}_{}.png'.format(prefix, name), image_dims=image_dims)
+        export_batch_as_image(data=y, output='outputs/images/{}_{}.png'.format(prefix, name), image_dims=image_dims,
+                              to_permute_for_channels=True)
         return
 
 
@@ -400,6 +399,9 @@ def main():
     save_interval = args.save_interval
 
     z_delay = args.z_delay
+
+    sample_images(iterator=val_iterator, image_dims=image_dims)
+
     for epoch in range(num_epochs):
         z_scale = 1
         epoch_str = str(epoch + 1).zfill(digits)
@@ -419,9 +421,7 @@ def main():
         print(line, file=output)
         output.flush()
 
-        # sample from / evaluate on the validation set
-        sample_images(iterator=val_iterator, image_dims=image_dims)
-
+        # evaluate on the validation set
         to_save_image_samples = ((epoch+1) % save_interval == 0)
         elbo_accum, gen_loss_accum, kl_loss_accum = eval_model(val_iterator, x_coord, p_net,
                                                                q_net, rotate=rotate, translate=translate,

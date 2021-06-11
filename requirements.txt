@@ -1,4 +1,5 @@
 # Assume python>=3.7
+matplotlib~=3.4.2
 numpy~=1.20.3
 pandas~=1.2.4
 Pillow~=8.2.0
