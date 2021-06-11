@@ -37,6 +37,9 @@ Datasets as tarballs are available from the links below.
 - [Antibody EM images](http://bergerlab-downloads.csail.mit.edu/spatial-vae/antibody.tar.gz)
 - [Galaxy zoo](http://bergerlab-downloads.csail.mit.edu/spatial-vae/galaxy_zoo.tar.gz)
 
+U### Assumptions
+Data has been downloaded and extracted to spatial-VAE/data/XXX, where XXX is the top level folder of the 
+main data set e.g. spatial-VAE/data/galaxy_zoo, which contains galaxy_zoo_test.py and galaxy_zoo_train.py. 
 
 ## Usage
 
@@ -58,8 +61,29 @@ Some script options include:
 --ctf-train, --ctf-test: path to tables containing CTF parameters for the train and test images, used to perform CTF correction if provided  
 --fit-noise: also output the standard deviation of each pixel from the spatial generator network, sometimes called a colored noise model  
 --save-prefix: save model parameters every few epochs to this path prefix  
-    
+
 See --help for complete arguments list.
+
+### Specific to galaxy.py
+Validation uses a portion of the training data. Control of how much is via these:  
+--num-train-images: number of training images (default: 0 = all)  
+--val-split: % split of training images for validation instead of training (default: 50)  
+
+Example for use on a personal computer:  
+```
+cd spatial-VAE
+python train_galaxy.py data/galaxy_zoo/galaxy_zoo_train.npy data/galaxy_zoo/galaxy_zoo_test.npy --num-epochs=4  --minibatch-size=64 --num-train-images=4000 --val-split=50 --save-prefix=galaxy --save-interval=2 -z=20
+```
+Adjust these for initial testing on an underpowered machine:  
+ * mini-batch-size
+ * num-train-images (the default of 0 uses all of them)
+ * num-epochs
+ 
+## Known issues
+File data/galaxy_zoo/galaxy_zoo_test.npy is currently redundant, code to be updated to either remove references to it 
+completely or to run a test after all training complete.
+ 
+Trained models and output images are saved to the *outputs/trained* and *outputs/images* directories respectively.
 
 ## License
 

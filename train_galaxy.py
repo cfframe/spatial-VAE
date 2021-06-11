@@ -277,7 +277,7 @@ def main():
 
     parser.add_argument('-d', '--device', type=int, default=-2, help='compute device to use')
     parser.add_argument('--num-train-images', type=int, default=0, help='number of training images (default: 0 = all)')
-    parser.add_argument('--val-split', type=int, default=50, help='% split of images for validation (default: 50)')
+    parser.add_argument('--val-split', type=int, default=50, help='% split of training images for validation instead of training (default: 50)')
 
     args = parser.parse_args()
 
