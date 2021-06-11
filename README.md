@@ -14,19 +14,7 @@ Learned antibody conformations (2-d latent variable) <br />
 
 ## Bibtex
 
-```
-@incollection{bepler2019spatialvae,
-title = {Explicitly disentangling image content from translation and rotation with spatial-VAE},
-author = {Bepler, Tristan and Zhong, Ellen and Kelley, Kotaro and Brignole, Edward and Berger, Bonnie},
-booktitle = {Advances in Neural Information Processing Systems 32},
-editor = {H. Wallach and H. Larochelle and A. Beygelzimer and F. d\textquotesingle Alch\'{e}-Buc and E. Fox and R. Garnett},
-pages = {15409--15419},
-year = {2019},
-publisher = {Curran Associates, Inc.},
-url = {http://papers.nips.cc/paper/9677-explicitly-disentangling-image-content-from-translation-and-rotation-with-spatial-vae.pdf}
-}
-```
-
+For Bibtex relating to the original paper, see [https://github.com/tbepler/spatial-VAE](https://github.com/tbepler/spatial-VAE) 
 
 ## Setup
 

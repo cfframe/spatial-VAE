@@ -41,6 +41,7 @@ class InferenceNetwork(nn.Module):
         layers.append(nn.Linear(hidden_dim, 2*latent_dim))
 
         self.layers = nn.Sequential(*layers)
+        print(self)
 
     def forward(self, x):
         # x is (batch, num_coords)
@@ -83,6 +84,7 @@ class SpatialGenerator(nn.Module):
         layers.append(nn.Linear(hidden_dim, n_out))
 
         self.layers = nn.Sequential(*layers)
+        print(self)
 
     def forward(self, x, z):
         # x is (batch, num_coords, 2)
@@ -153,6 +155,7 @@ class VanillaGenerator(nn.Module):
             layers.append(nn.Softplus())
 
         self.layers = nn.Sequential(*layers)
+        print(self)
 
     def forward(self, x, z):
         # x is (batch, num_coords, 2)

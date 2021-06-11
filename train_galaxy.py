@@ -1,10 +1,14 @@
 from __future__ import print_function, division
 
 import numpy as np
+import os
 import pandas as pd
 import sys
 
 from PIL import Image
+from src.file_tools import FileTools
+import spatial_vae.models as models
+import spatial_vae.mrc as mrc
 
 import torch
 import torch.nn as nn
@@ -12,13 +16,14 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.utils.data
 import torchvision
+from torchvision.utils import save_image
 
-import spatial_vae.models as models
-import spatial_vae.mrc as mrc
+from tqdm import tqdm
 
 
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
                    augment_rotation=False, z_scale=1, use_cuda=False):
+
     b = y.size(0)
     x = x.expand(b, x.size(0), x.size(1))
     n = int(np.sqrt(y.size(1)))
@@ -67,7 +72,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
         z_logstd = z_logstd[:, 1:]
 
         if np.any(offset > 0):
-            # invert the random rotation to reconstruct original with rotaion offset
+            # invert the random rotation to reconstruct original with rotation offset
             offset = torch.from_numpy(offset).float().to(z.device)
             theta = theta + offset
 
@@ -110,7 +115,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     
     elbo = log_p_x_g_z - kl_div
 
-    return elbo, log_p_x_g_z, kl_div
+    return elbo, log_p_x_g_z, kl_div, y_hat
 
 
 def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True,
@@ -119,17 +124,17 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
     p_net.train()
     q_net.train()
 
-    c = 0
+    count_accum = 0
     gen_loss_accum = 0
     kl_loss_accum = 0
     elbo_accum = 0
 
     for y, in iterator:
-        b = y.size(0)
+        batch_size = y.size(0)
         x = Variable(x_coord)
         y = Variable(y)
 
-        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
+        elbo, log_p_x_g_z, kl_div, _ = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
                                                    dx_scale=dx_scale, theta_prior=theta_prior,
                                                    augment_rotation=augment_rotation, z_scale=z_scale,
                                                    use_cuda=use_cuda)
@@ -143,18 +148,18 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         gen_loss = -log_p_x_g_z.item()
         kl_loss = kl_div.item()
 
-        c += b
-        delta = b*(gen_loss - gen_loss_accum)
-        gen_loss_accum += delta/c
+        count_accum += batch_size
+        delta = batch_size*(gen_loss - gen_loss_accum)
+        gen_loss_accum += delta/count_accum
 
-        delta = b*(elbo - elbo_accum)
-        elbo_accum += delta/c
+        delta = batch_size*(elbo - elbo_accum)
+        elbo_accum += delta/count_accum
 
-        delta = b*(kl_loss - kl_loss_accum)
-        kl_loss_accum += delta/c
+        delta = batch_size*(kl_loss - kl_loss_accum)
+        kl_loss_accum += delta/count_accum
 
         template = '# [{}/{}] training {:.1%}, ELBO={:.5f}, Error={:.5f}, KL={:.5f}'
-        line = template.format(epoch+1, num_epochs, c/N, elbo_accum, gen_loss_accum, kl_loss_accum)
+        line = template.format(epoch+1, num_epochs, count_accum/N, elbo_accum, gen_loss_accum, kl_loss_accum)
         print(line, end='\r', file=sys.stderr)
 
     print(' '*80, end='\r', file=sys.stderr)
@@ -162,37 +167,48 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
 
 
 def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
-               dx_scale=0.1, theta_prior=np.pi, z_scale=1, use_cuda=False):
+               dx_scale=0.1, theta_prior=np.pi, z_scale=1, use_cuda=False,
+               to_save_image_samples=False,
+               image_dims=None, epoch='0'):
+
     p_net.eval()
     q_net.eval()
 
-    c = 0
+    count_accum = 0
     gen_loss_accum = 0
     kl_loss_accum = 0
     elbo_accum = 0
+    iteration_count = -1
 
     for y, in iterator:
-        b = y.size(0)
+        iteration_count += 1
+
+        batch_size = y.size(0)
         x = Variable(x_coord)
         y = Variable(y)
 
-        elbo, log_p_x_g_z, kl_div = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
-                                                   dx_scale=dx_scale, theta_prior=theta_prior,
-                                                   z_scale=z_scale, use_cuda=use_cuda)
+        elbo, log_p_x_g_z, kl_div, y_hat = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
+                                                          dx_scale=dx_scale, theta_prior=theta_prior,
+                                                          z_scale=z_scale, use_cuda=use_cuda)
 
         elbo = elbo.item()
         gen_loss = -log_p_x_g_z.item()
         kl_loss = kl_div.item()
 
-        c += b
-        delta = b*(gen_loss - gen_loss_accum)
-        gen_loss_accum += delta/c
+        count_accum += batch_size
+        delta = batch_size*(gen_loss - gen_loss_accum)
+        gen_loss_accum += delta/count_accum
 
-        delta = b*(elbo - elbo_accum)
-        elbo_accum += delta/c
+        delta = batch_size*(elbo - elbo_accum)
+        elbo_accum += delta/count_accum
 
-        delta = b*(kl_loss - kl_loss_accum)
-        kl_loss_accum += delta/c
+        delta = batch_size*(kl_loss - kl_loss_accum)
+        kl_loss_accum += delta/count_accum
+
+        # Reconstruct and save images in first batch of each epoch, as a sample
+        if iteration_count == 0 and to_save_image_samples and image_dims:
+            export_batch_as_image(data=y_hat, output='outputs/images/{}_output.png'.format(epoch),
+                                  image_dims=image_dims)
 
     return elbo_accum, gen_loss_accum, kl_loss_accum
 
@@ -205,6 +221,22 @@ def load_images(path):
     elif path.endswith('npy'):
         images = np.load(path)
     return images
+
+
+def export_batch_as_image(data, output, image_dims):
+    # Re-cast data view
+    images = data.view(data.size()[0], *image_dims, -1)
+    images = images.permute(0, 3, 1, 2)
+    # need torch.cat?
+    # Assume square of images, so no. of rows is square root of number of images
+    rows = int(data.size()[0] ** 0.5)
+    save_image(images.cpu(), output, nrow=rows)
+
+
+def sample_images(iterator, image_dims=None, name='sample', prefix=''):
+    for y, in iterator:
+        export_batch_as_image(data=y, output='outputs/images/{}_{}.png'.format(prefix, name), image_dims=image_dims)
+        return
 
 
 def main():
@@ -248,9 +280,15 @@ def main():
     parser.add_argument('--val-split', type=int, default=50, help='% split of images for validation (default: 50)')
 
     args = parser.parse_args()
+
+    output_dir = 'outputs'
+    trained_dir = os.path.join(output_dir, 'trained')
+    images_dir = os.path.join(output_dir, 'images')
+    FileTools.ensure_empty_sub_directory(trained_dir)
+    FileTools.ensure_empty_sub_directory(images_dir)
+
     num_epochs = args.num_epochs
     num_train_images = args.num_train_images
-    # num_test_images = args.num_val_images
     val_split = args.val_split
 
     digits = int(np.log10(num_epochs)) + 1
@@ -268,11 +306,9 @@ def main():
     num_val_images = int(val_split * len(images_train) / 100)
     images_val = images_train[:num_val_images]
     images_train = images_train[num_val_images:]
-    # cff if num_test_images > 0:
-    #     np.random.shuffle(images_test)
-    #     images_test = images_test[:num_test_images]
 
     n, m = images_train.shape[1:3]
+    image_dims = [n, m]
 
     # x coordinate array
     xgrid = np.linspace(-1, 1, m)
@@ -287,11 +323,11 @@ def main():
     y_val = images_val.view(-1, n*m, 3)
 
     # # set the device
-    d = args.device
-    use_cuda = (d != -1) and torch.cuda.is_available()
-    if d >= 0:
-        torch.cuda.set_device(d)
-        print('# using CUDA device:', d, file=sys.stderr)
+    device = args.device
+    use_cuda = (device != -1) and torch.cuda.is_available()
+    if device >= 0:
+        torch.cuda.set_device(device)
+        print('# using CUDA device:', device, file=sys.stderr)
 
     augment_rotation = args.augment_rotation
     if use_cuda:
@@ -305,6 +341,9 @@ def main():
 
     num_layers = args.p_num_layers
     hidden_dim = args.p_hidden_dim
+
+    # default activation
+    activation = nn.LeakyReLU
     if args.activation == 'tanh':
         activation = nn.Tanh
     elif args.activation == 'relu':
@@ -351,9 +390,8 @@ def main():
     optim = torch.optim.Adam(params, lr=lr)
     minibatch_size = args.minibatch_size
 
-    train_iterator = torch.utils.data.DataLoader(data_train, batch_size=minibatch_size,
-                                                 shuffle=True)
-    test_iterator = torch.utils.data.DataLoader(data_val, batch_size=minibatch_size)
+    train_iterator = torch.utils.data.DataLoader(data_train, batch_size=minibatch_size, shuffle=True)
+    val_iterator = torch.utils.data.DataLoader(data_val, batch_size=minibatch_size, shuffle=False)
 
     output = sys.stdout
     print('\t'.join(['Epoch', 'Split', 'ELBO', 'Error', 'KL']), file=output)
@@ -364,6 +402,8 @@ def main():
     z_delay = args.z_delay
     for epoch in range(num_epochs):
         z_scale = 1
+        epoch_str = str(epoch + 1).zfill(digits)
+
         if epoch < z_delay:
             z_scale = 0
 
@@ -379,12 +419,18 @@ def main():
         print(line, file=output)
         output.flush()
 
-        # evaluate on the test set
-        elbo_accum, gen_loss_accum, kl_loss_accum = eval_model(test_iterator, x_coord, p_net,
+        # sample from / evaluate on the validation set
+        sample_images(iterator=val_iterator, image_dims=image_dims)
+
+        to_save_image_samples = ((epoch+1) % save_interval == 0)
+        elbo_accum, gen_loss_accum, kl_loss_accum = eval_model(val_iterator, x_coord, p_net,
                                                                q_net, rotate=rotate, translate=translate,
                                                                dx_scale=dx_scale, theta_prior=theta_prior,
                                                                z_scale=z_scale,
-                                                               use_cuda=use_cuda
+                                                               use_cuda=use_cuda,
+                                                               to_save_image_samples=to_save_image_samples,
+                                                               image_dims=image_dims,
+                                                               epoch=epoch_str
                                                                )
         line = '\t'.join([str(epoch+1), 'validation', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
         print(line, file=output)
@@ -392,13 +438,12 @@ def main():
 
         # save the models
         if path_prefix is not None and (epoch+1) % save_interval == 0:
-            epoch_str = str(epoch+1).zfill(digits)
 
-            path = path_prefix + '_generator_epoch{}.sav'.format(epoch_str)
+            path = os.path.join(trained_dir, path_prefix + '_generator_epoch{}.sav'.format(epoch_str))
             p_net.eval().cpu()
             torch.save(p_net, path)
 
-            path = path_prefix + '_inference_epoch{}.sav'.format(epoch_str)
+            path = os.path.join(trained_dir, path_prefix + '_inference_epoch{}.sav'.format(epoch_str))
             q_net.eval().cpu()
             torch.save(q_net, path)
 
