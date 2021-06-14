@@ -25,13 +25,15 @@ class FileTools:
             if Path(dir_path).exists():
                 if len(os.listdir(dir_path)) > 0:
                     result = 'Directory exists, not empty, deleting content'
+                    # Clear sub-dirs first then tackle files
+                    for root, dirs, files in os.walk(dir_path, topdown=False):
+                        for directory in dirs:
+                            to_remove = os.path.join(root, directory)
+                            shutil.rmtree(to_remove)
                     for root, dirs, files in os.walk(dir_path, topdown=False):
                         for file in files:
                             to_remove = os.path.join(dir_path, file)
                             os.remove(to_remove)
-                        for directory in dirs:
-                            to_remove = os.path.join(root, directory)
-                            shutil.rmtree(to_remove)
                 else:
                     result = 'Directory exists'
             else:
