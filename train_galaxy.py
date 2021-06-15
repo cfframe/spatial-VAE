@@ -1,5 +1,6 @@
 from __future__ import print_function, division
 
+import argparse
 import numpy as np
 import os
 import pandas as pd
@@ -239,7 +240,8 @@ def sample_images(iterator, image_dims=None, name='sample', prefix=''):
 
 
 def main():
-    import argparse
+    if input('WARNING This will clear the Outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
+        quit()
 
     parser = argparse.ArgumentParser('Train spatial-VAE on galaxy datasets')
 
@@ -301,7 +303,7 @@ def main():
     images_train = np.load(args.train_path)
     # images_test = np.load(args.test_path)
 
-    # cff Add-in to enable a quick litmus test
+    # Add-in to enable a quick litmus test
     np.random.shuffle(images_train)
     if num_train_images > 0:
         images_train = images_train[:num_train_images]
@@ -406,6 +408,13 @@ def main():
 
     sample_images(iterator=val_iterator, image_dims=image_dims)
 
+    train_results = []
+    val_results = []
+
+    header_parts = '\t'.join(['Epoch', 'Split', 'ELBO', 'General loss', 'KL'])
+    train_results.append(header_parts)
+    val_results.append(header_parts)
+
     for epoch in range(num_epochs):
         z_scale = 1
         epoch_str = str(epoch + 1).zfill(digits)
@@ -422,6 +431,7 @@ def main():
                                                                 use_cuda=use_cuda)
 
         line = '\t'.join([str(epoch+1), 'train', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
+        train_results.append(line)
         print(line, file=output)
         output.flush()
 
@@ -437,6 +447,7 @@ def main():
                                                                epoch=epoch_str
                                                                )
         line = '\t'.join([str(epoch+1), 'validation', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
+        val_results.append(line)
         print(line, file=output)
         output.flush()
 
@@ -454,6 +465,15 @@ def main():
             if use_cuda:
                 p_net.cuda()
                 q_net.cuda()
+
+    train_results_path = os.path.join(output_dir, 'train.txt')
+    val_results_path = os.path.join(output_dir, 'val.txt')
+
+    with open(train_results_path, 'w') as train_file:
+        print('\n'.join(train_results), file=train_file)
+
+    with open(val_results_path, 'w') as val_file:
+        print('\n'.join(val_results), file=val_file)
 
 
 if __name__ == '__main__':
