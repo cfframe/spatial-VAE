@@ -286,6 +286,10 @@ def main():
     FileTools.ensure_empty_sub_directory(trained_dir)
     FileTools.ensure_empty_sub_directory(images_dir)
 
+    # Save list of arguments with values
+    FileTools.save_command_args_to_file(script='train_galaxy.py', args=vars(args),
+                                        save_path=os.path.join(output_dir, 'command.txt'))
+
     num_epochs = args.num_epochs
     num_train_images = args.num_train_images
     val_split = args.val_split

@@ -86,3 +86,33 @@ class FileTools:
         print('Images saved at {}'.format(end_file_name))
 
         return result
+
+    @staticmethod
+    def save_command_args_to_file(script: str, args: dict, save_path: str):
+        """Save arguments and their values to file. Expects args of type dict, so use vars(args) as input.
+
+        Keyword arguments:
+
+        :param script: python script being run
+        :param args: dict, full arguments list
+        :param save_path: str, path to file
+        """
+        if not script.endswith('.py'):
+            script += '.py'
+
+        command = 'python {}'.format(script)
+        parts = [command]
+        lines = []
+
+        for k, v in args.items():
+            parts.append('--{} {}'.format(k, v))
+            lines.append('{}={}'.format(k, v))
+
+        command_line = ' '.join(parts)
+        lines.insert(0, command_line)
+        content = '\n'.join(lines)
+
+        with open(save_path, 'w', encoding='utf-8') as outfile:
+            outfile.write(content)
+            print('Output saved to {}.'.format(save_path))
+
