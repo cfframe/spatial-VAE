@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import argparse
+import datetime
 import numpy as np
 import os
 import pandas as pd
@@ -399,7 +400,8 @@ def main():
     val_iterator = torch.utils.data.DataLoader(data_val, batch_size=minibatch_size, shuffle=False)
 
     output = sys.stdout
-    print('\t'.join(['Epoch', 'Split', 'ELBO', 'Error', 'KL']), file=output)
+    header_parts = '\t'.join(['Epoch', 'Date', 'Time', 'Split', 'ELBO', 'General loss', 'KL'])
+    print(header_parts, file=output)
 
     path_prefix = args.save_prefix
     save_interval = args.save_interval
@@ -411,7 +413,6 @@ def main():
     train_results = []
     val_results = []
 
-    header_parts = '\t'.join(['Epoch', 'Split', 'ELBO', 'General loss', 'KL'])
     train_results.append(header_parts)
     val_results.append(header_parts)
 
@@ -430,7 +431,10 @@ def main():
                                                                 epoch=epoch, num_epochs=num_epochs, N=N,
                                                                 use_cuda=use_cuda)
 
-        line = '\t'.join([str(epoch+1), 'train', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
+        line = '\t'.join([str(epoch+1), datetime.datetime.now().strftime('%y%m%d'),
+                          datetime.datetime.now().strftime('%H%M%S'),
+                          'train',
+                          str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
         train_results.append(line)
         print(line, file=output)
         output.flush()
@@ -446,7 +450,11 @@ def main():
                                                                image_dims=image_dims,
                                                                epoch=epoch_str
                                                                )
-        line = '\t'.join([str(epoch+1), 'validation', str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
+
+        line = '\t'.join([str(epoch + 1), datetime.datetime.now().strftime('%y%m%d'),
+                          datetime.datetime.now().strftime('%H%M%S'),
+                          'validation',
+                          str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
         val_results.append(line)
         print(line, file=output)
         output.flush()
