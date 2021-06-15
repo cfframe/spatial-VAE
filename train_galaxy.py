@@ -241,8 +241,6 @@ def sample_images(iterator, image_dims=None, name='sample', prefix=''):
 
 
 def main():
-    if input('WARNING This will clear the Outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
-        quit()
 
     parser = argparse.ArgumentParser('Train spatial-VAE on galaxy datasets')
 
@@ -280,8 +278,14 @@ def main():
     parser.add_argument('-d', '--device', type=int, default=-2, help='compute device to use')
     parser.add_argument('--num-train-images', type=int, default=0, help='number of training images (default: 0 = all)')
     parser.add_argument('--val-split', type=int, default=50, help='% split of training images for validation instead of training (default: 50)')
+    parser.add_argument('--delete_outputs_at_start', action='store_true', help='delete Outputs directory content at start')
 
     args = parser.parse_args()
+
+    # Final warning
+    if not args.delete_outputs_at_start \
+            and input('WARNING This will clear the Outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
+        quit()
 
     output_dir = 'outputs'
     trained_dir = os.path.join(output_dir, 'trained')
