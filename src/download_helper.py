@@ -40,7 +40,7 @@ class DownloadHelper:
     def can_extract_to_extraction_dir(
             unzip_dir: str,
             replace_content: str = 'n') -> bool:
-        """Determine whether or not to download file
+        """Determine whether or not should be able to extract content from an archive file
 
         Keyword arguments:
         :param unzip_dir: final directory for extracted files

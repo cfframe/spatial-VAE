@@ -201,8 +201,8 @@ def mnist_arguments():
 
     parser.add_argument('--dx-scale', type=float, default=0.1,
                         help='standard deviation of translation latent variables (default: 0.1)')
-    parser.add_argument('--theta-prior', type=float, default=(np.pi / 4)**2,
-                        help='standard deviation on rotation prior (default: square of pi/4)')
+    parser.add_argument('--theta-prior', type=float, default=np.pi/4,
+                        help='standard deviation on rotation prior (default: pi/4)')
 
     parser.add_argument('-l', '--learning-rate', type=float, default=1e-4, help='learning rate (default: 0.0001)')
     parser.add_argument('--minibatch-size', type=int, default=100, help='minibatch size (default: 100)')
