@@ -7,7 +7,7 @@ Example usage:
 python get_dataset.py --help
 python get_dataset.py -d data -rd n
 python get_dataset.py -d data -rd y -rt y
-python get_dataset.py -d data -rd n -ruc n -s http://bergerlab-downloads.csail.mit.edu/spatial-vae/mnist_rotated.tar.gz
+python get_dataset.py -d data -rd n -ruc n -s http://bergerlab-downloads.csail.mit.edu/spatial-vae/mnist_rotated_translated.tar.gz
 python get_dataset.py -d data -rd n -ruc n -s http://bergerlab-downloads.csail.mit.edu/spatial-vae/galaxy_zoo.tar.gz
 
 Datasets for spatial-VAE

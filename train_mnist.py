@@ -3,6 +3,7 @@ from __future__ import print_function, division
 import argparse
 import datetime
 import numpy as np
+import os
 import sys
 
 import torch
@@ -393,11 +394,11 @@ def main():
         # save the models
         if path_prefix is not None and (epoch+1) % save_interval == 0:
 
-            path = path_prefix + '_generator_epoch{}.sav'.format(epoch_str)
+            path = os.path.join(trained_dir, path_prefix + '_generator_epoch{}.sav'.format(epoch_str))
             p_net.eval().cpu()
             torch.save(p_net, path)
 
-            path = path_prefix + '_inference_epoch{}.sav'.format(epoch_str)
+            path = os.path.join(trained_dir, path_prefix + '_inference_epoch{}.sav'.format(epoch_str))
             q_net.eval().cpu()
             torch.save(q_net, path)
 
