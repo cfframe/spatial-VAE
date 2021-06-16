@@ -287,6 +287,9 @@ def main():
             and input('WARNING This will clear the Outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
         quit()
 
+    start_time = datetime.datetime.now()
+    print(f"Start : {start_time.strftime('%y%m%d_%H%M%S')}")
+
     output_dir = 'outputs'
     trained_dir = os.path.join(output_dir, 'trained')
     images_dir = os.path.join(output_dir, 'images')
@@ -420,8 +423,6 @@ def main():
     train_results.append(header_parts)
     val_results.append(header_parts)
 
-    print('START: {}'.format(datetime.datetime.now().strftime('%y%m%d_%H%M%S')))
-
     for epoch in range(num_epochs):
         z_scale = 1
         epoch_str = str(epoch + 1).zfill(digits)
@@ -489,7 +490,11 @@ def main():
     with open(val_results_path, 'w') as val_file:
         print('\n'.join(val_results), file=val_file)
 
-    print('END: {}'.format(datetime.datetime.now().strftime('%y%m%d_%H%M%S')))
+    end_time = datetime.datetime.now()
+    print(f"End : {end_time.strftime('%y%m%d_%H%M%S')}")
+
+    elapsed_time = (end_time - start_time)
+    print(f"Elapsed time: {elapsed_time}")
 
 
 if __name__ == '__main__':
