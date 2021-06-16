@@ -20,7 +20,6 @@ import torch.utils.data
 from torchvision.utils import save_image
 
 
-
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
                    augment_rotation=False, z_scale=1, use_cuda=False):
 
@@ -230,7 +229,7 @@ def export_batch_as_image(data, output, image_dims, to_permute_for_channels=True
         images = images.permute(0, 3, 1, 2)
     # Assume square of images, so no. of rows is square root of number of images
     rows = int(data.size()[0] ** 0.5)
-    save_image(images.cpu(), output, nrow=rows)
+    save_image(images.cpu(), output, nrow=rows, padding=3, pad_value=0.5)
 
 
 def sample_images(iterator, image_dims=None, name='sample', prefix=''):
