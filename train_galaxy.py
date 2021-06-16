@@ -8,7 +8,6 @@ import pandas as pd
 import sys
 
 from PIL import Image
-from src.file_tools import FileTools
 import spatial_vae.models as models
 import spatial_vae.mrc as mrc
 
@@ -17,7 +16,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.utils.data
-from torchvision.utils import save_image
+
+from src.misc_tools import MiscTools
 
 
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
@@ -168,7 +168,8 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
 def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
                dx_scale=0.1, theta_prior=np.pi, z_scale=1, use_cuda=False,
                to_save_image_samples=False,
-               image_dims=None, epoch='0'):
+               image_dims=None, epoch='0',
+               output_dir='outputs'):
 
     p_net.eval()
     q_net.eval()
@@ -181,7 +182,6 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
 
     for y, in iterator:
         iteration_count += 1
-
         batch_size = y.size(0)
         x = Variable(x_coord)
         y = Variable(y)
@@ -206,8 +206,9 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
 
         # Reconstruct and save images in first batch of each epoch, as a sample
         if iteration_count == 0 and to_save_image_samples and image_dims:
-            export_batch_as_image(data=y_hat, output='outputs/images/{}_output.png'.format(epoch),
-                                  image_dims=image_dims, to_permute_for_channels=True)
+            MiscTools.export_batch_as_image(data=y_hat,
+                                            output='{}/images/{}_output.png'.format(output_dir, epoch),
+                                            image_dims=image_dims, to_permute_for_channels=True)
 
     return elbo_accum, gen_loss_accum, kl_loss_accum
 
@@ -222,25 +223,7 @@ def load_images(path):
     return images
 
 
-def export_batch_as_image(data, output, image_dims, to_permute_for_channels=True):
-    # Re-cast data view to original image dimensions
-    images = data.view(data.size()[0], *image_dims, -1)
-    if to_permute_for_channels:
-        images = images.permute(0, 3, 1, 2)
-    # Assume square of images, so no. of rows is square root of number of images
-    rows = int(data.size()[0] ** 0.5)
-    save_image(images.cpu(), output, nrow=rows, padding=3, pad_value=0.5)
-
-
-def sample_images(iterator, image_dims=None, name='sample', prefix=''):
-    for y, in iterator:
-        export_batch_as_image(data=y, output='outputs/images/{}_{}.png'.format(prefix, name), image_dims=image_dims,
-                              to_permute_for_channels=True)
-        return
-
-
-def main():
-
+def galaxy_arguments():
     parser = argparse.ArgumentParser('Train spatial-VAE on galaxy datasets')
 
     parser.add_argument('train_path', help='path to training data')
@@ -279,38 +262,23 @@ def main():
     parser.add_argument('--val-split', type=int, default=50, help='% split of training images for validation instead of training (default: 50)')
     parser.add_argument('--delete_outputs_at_start', action='store_true', help='delete Outputs directory content at start')
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    # Final warning
-    if not args.delete_outputs_at_start \
-            and input('WARNING This will clear the Outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
-        quit()
 
-    start_time = datetime.datetime.now()
-    print(f"Start : {start_time.strftime('%y%m%d_%H%M%S')}")
+def main():
 
-    output_dir = 'outputs'
-    trained_dir = os.path.join(output_dir, 'trained')
-    images_dir = os.path.join(output_dir, 'images')
-    FileTools.ensure_empty_sub_directory(trained_dir)
-    FileTools.ensure_empty_sub_directory(images_dir)
+    args = galaxy_arguments()
+    dataset_type = 'galaxy'
 
-    # Save list of arguments with values
-    FileTools.save_command_args_to_file(script='train_galaxy.py', args=vars(args),
-                                        save_path=os.path.join(output_dir, 'command.txt'))
-
-    num_epochs = args.num_epochs
-    num_train_images = args.num_train_images
-    val_split = args.val_split
-
-    digits = int(np.log10(num_epochs)) + 1
+    start_time, output_dir, trained_dir, images_dir, num_epochs, num_train_images, val_split, digits\
+        = MiscTools.prep_pre_load_images(args, dataset_type)
 
     # load the images
     print('# loading data...', file=sys.stderr)
     images_train = np.load(args.train_path)
     # images_test = np.load(args.test_path)
 
-    # Add-in to enable a quick litmus test
+    # num_train_images enables a quick litmus test with fewer images
     np.random.shuffle(images_train)
     if num_train_images > 0:
         images_train = images_train[:num_train_images]
@@ -322,17 +290,17 @@ def main():
     n, m = images_train.shape[1:3]
     image_dims = [n, m]
 
-    # x coordinate array
+    images_train = torch.from_numpy(images_train).float()/255
+    images_val = torch.from_numpy(images_val).float()/255
+    y_train = images_train.view(-1, n*m, 3)
+    y_val = images_val.view(-1, n*m, 3)
+
+    # # x coordinate array
     xgrid = np.linspace(-1, 1, m)
     ygrid = np.linspace(1, -1, n)
     x0, x1 = np.meshgrid(xgrid, ygrid)
     x_coord = np.stack([x0.ravel(), x1.ravel()], 1)
     x_coord = torch.from_numpy(x_coord).float()
-
-    images_train = torch.from_numpy(images_train).float()/255
-    images_val = torch.from_numpy(images_val).float()/255
-    y_train = images_train.view(-1, n*m, 3)
-    y_val = images_val.view(-1, n*m, 3)
 
     # # set the device
     device = args.device
@@ -343,6 +311,8 @@ def main():
 
     augment_rotation = args.augment_rotation
     if use_cuda:
+        y_train = y_train.cuda()
+        y_val = y_val.cuda()
         x_coord = x_coord.cuda()
 
     data_train = torch.utils.data.TensorDataset(y_train)
@@ -361,6 +331,7 @@ def main():
     elif args.activation == 'relu':
         activation = nn.LeakyReLU
 
+    # Build models
     if args.vanilla:
         print('# using the vanilla MLP generator architecture', file=sys.stderr)
         n_out = 3*n*m
@@ -395,7 +366,7 @@ def main():
 
     print('# using priors: theta={}, dx={}'.format(theta_prior, dx_scale), file=sys.stderr)
 
-    N = len(data_train)
+    N = len(images_train)
     params = list(p_net.parameters()) + list(q_net.parameters())
 
     lr = args.learning_rate
@@ -405,16 +376,17 @@ def main():
     train_iterator = torch.utils.data.DataLoader(data_train, batch_size=minibatch_size, shuffle=True)
     val_iterator = torch.utils.data.DataLoader(data_val, batch_size=minibatch_size, shuffle=False)
 
-    output = sys.stdout
-    header_parts = '\t'.join(['Epoch', 'Date', 'Time', 'Split', 'ELBO', 'General loss', 'KL'])
-    print(header_parts, file=output)
-
     path_prefix = args.save_prefix
     save_interval = args.save_interval
 
     z_delay = args.z_delay
 
-    sample_images(iterator=val_iterator, image_dims=image_dims)
+    MiscTools.sample_images(iterator=val_iterator, image_dims=image_dims, output_dir=output_dir)
+
+    # Initialise results bins
+    output = sys.stdout
+    header_parts = '\t'.join(['Epoch', 'Date', 'Time', 'Split', 'ELBO', 'General loss', 'KL'])
+    print(header_parts, file=output)
 
     train_results = []
     val_results = []
@@ -454,7 +426,7 @@ def main():
                                                                use_cuda=use_cuda,
                                                                to_save_image_samples=to_save_image_samples,
                                                                image_dims=image_dims,
-                                                               epoch=epoch_str
+                                                               epoch=epoch_str, output_dir=output_dir
                                                                )
 
         line = '\t'.join([str(epoch + 1), datetime.datetime.now().strftime('%y%m%d'),
@@ -476,18 +448,12 @@ def main():
             q_net.eval().cpu()
             torch.save(q_net, path)
 
+            # Revert to cuda
             if use_cuda:
                 p_net.cuda()
                 q_net.cuda()
 
-    train_results_path = os.path.join(output_dir, 'train.txt')
-    val_results_path = os.path.join(output_dir, 'val.txt')
-
-    with open(train_results_path, 'w') as train_file:
-        print('\n'.join(train_results), file=train_file)
-
-    with open(val_results_path, 'w') as val_file:
-        print('\n'.join(val_results), file=val_file)
+    MiscTools.save_results(output_dir=output_dir, train_results=train_results, val_results=val_results )
 
     end_time = datetime.datetime.now()
     print(f"End : {end_time.strftime('%y%m%d_%H%M%S')}")

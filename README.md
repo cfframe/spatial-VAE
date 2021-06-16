@@ -1,16 +1,6 @@
 # spatial-VAE
 
-Source code and datasets for [Explicitly disentangling image content from translation and rotation with spatial-VAE](https://arxiv.org/abs/1909.11663) to appear at NeurIPS 2019.
-
-
-Learned hinge motion of 5HDB (1-d latent variable) <br />
-![5HDB_gif](gifs/5HDB_spatial.gif)
-
-Learned arm motion of CODH/ACS (2-d latent variable) <br />
-![codhacs_gif](gifs/codhacs_spatial.gif)
-
-Learned antibody conformations (2-d latent variable) <br />
-![antibody_gif](gifs/antibody_spatial.gif)
+Original source code and datasets sourced from GitHub repo for [Explicitly disentangling image content from translation and rotation with spatial-VAE](https://arxiv.org/abs/1909.11663) to appear at NeurIPS 2019.
 
 ## Bibtex
 
@@ -24,7 +14,6 @@ Dependencies:
 - torchvision
 - numpy
 - pillow
-- [topaz](https://github.com/tbepler/topaz) (for loading MRC files)
 
 ## Datasets
 
@@ -64,7 +53,7 @@ Some script options include:
 
 See --help for complete arguments list.
 
-### Specific to galaxy.py
+### Specific to updated train_galaxy.py and train_mnist.py
 Validation uses a portion of the training data. Control of how much is via these:  
 --num-train-images: number of training images (default: 0 = all)  
 --val-split: % split of training images for validation instead of training (default: 50)  
@@ -73,6 +62,8 @@ Example for use on a personal computer:
 ```
 cd spatial-VAE
 python train_galaxy.py data/galaxy_zoo/galaxy_zoo_train.npy data/galaxy_zoo/galaxy_zoo_test.npy --num-epochs=4  --minibatch-size=64 --num-train-images=4000 --val-split=50 --save-prefix=galaxy --save-interval=2 -z=20
+python train_mnist.py --num-epochs=2 --minibatch-size=64 --val-split=50 --save-prefix=mnist_rt_ --save-interval=1 -z=100 --vanilla
+
 ```
 Adjust these for initial testing on an underpowered machine:  
  * mini-batch-size
