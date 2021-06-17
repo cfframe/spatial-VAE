@@ -4,6 +4,7 @@ import datetime
 import numpy as np
 import os
 import shutil
+import torch
 
 from src.file_tools import FileTools
 from pathlib import Path
@@ -45,8 +46,8 @@ class MiscTools:
 
         trained_dir = os.path.join(output_dir, 'trained')
         images_dir = os.path.join(output_dir, 'images')
-        FileTools.ensure_empty_sub_directory(trained_dir)
-        FileTools.ensure_empty_sub_directory(images_dir)
+        FileTools.ensure_empty_directory(trained_dir)
+        FileTools.ensure_empty_directory(images_dir)
 
         # Save list of arguments with values
         FileTools.save_command_args_to_file(script=script, args=vars(args),
@@ -70,4 +71,23 @@ class MiscTools:
 
         with open(val_results_path, 'w') as val_file:
             print('\n'.join(val_results), file=val_file)
+
+    @staticmethod
+    def save_models(path_prefix, epoch, digits, save_interval, trained_dir, p_net, q_net, use_cuda):
+
+        if path_prefix is not None and (epoch+1) % save_interval == 0:
+            epoch_str = str(epoch + 1).zfill(digits)
+
+            path = os.path.join(trained_dir, path_prefix + '_generator_epoch{}.sav'.format(epoch_str))
+            p_net.eval().cpu()
+            torch.save(p_net, path)
+
+            path = os.path.join(trained_dir, path_prefix + '_inference_epoch{}.sav'.format(epoch_str))
+            q_net.eval().cpu()
+            torch.save(q_net, path)
+
+            # Revert to cuda
+            if use_cuda:
+                p_net.cuda()
+                q_net.cuda()
 

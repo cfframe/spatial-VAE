@@ -10,8 +10,8 @@ class FileTools:
     """Utilities for managing data from and to files"""
 
     @staticmethod
-    def ensure_empty_sub_directory(dir_path: str) -> str:
-        """If path does not exist, create it
+    def ensure_empty_directory(dir_path: str) -> str:
+        """If path does not exist, create it. If it does exist, empty it.
 
         Keyword arguments:
         :param dir_path: root directory path
@@ -44,7 +44,7 @@ class FileTools:
 
         except Exception as err:
             error_message = \
-                "Unexpected error in FileTools.ensure_empty_sub_directory\n"\
+                "Unexpected error in FileTools.ensure_empty_directory\n"\
                 + str(err.args)
             raise Exception(error_message)
 
@@ -115,4 +115,3 @@ class FileTools:
         with open(save_path, 'w', encoding='utf-8') as outfile:
             outfile.write(content)
             print('Output saved to {}.'.format(save_path))
-
