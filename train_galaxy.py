@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import argparse
 import datetime
+import logging
 import numpy as np
 import os
 import pandas as pd
@@ -17,6 +18,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.utils.data
 
+from pathlib import Path
+from src.file_tools import FileTools
 from src.misc_tools import MiscTools
 
 
@@ -260,7 +263,6 @@ def galaxy_arguments():
     parser.add_argument('-d', '--device', type=int, default=-2, help='compute device to use')
     parser.add_argument('--num-train-images', type=int, default=0, help='number of training images (default: 0 = all)')
     parser.add_argument('--val-split', type=int, default=50, help='% split of training images for validation instead of training (default: 50)')
-    parser.add_argument('--delete_outputs_at_start', action='store_true', help='delete Outputs directory content at start')
 
     return parser.parse_args()
 
@@ -463,5 +465,10 @@ def main():
 
 
 if __name__ == '__main__':
+    Path('logs').mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(filename='galaxy.log', format='%(asctime)s %(levelname)s:%(message)s',
+                        datefmt='%Y%m%d %H:%M:%S', filemode='w', level=logging.DEBUG)
+    logging.info('Started')
     main()
+    logging.info('Finished')
 

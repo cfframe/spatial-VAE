@@ -34,8 +34,7 @@ class MiscTools:
     @staticmethod
     def prep_pre_load_images(args, dataset_type):
         # Final warning
-        if not args.delete_outputs_at_start \
-                and input(
+        if input(
             'WARNING This will clear the outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
             quit()
 
