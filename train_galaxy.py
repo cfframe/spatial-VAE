@@ -363,6 +363,8 @@ def main():
         p_net.cuda()
         q_net.cuda()
 
+    MiscTools.save_model_specs_to_file(output_dir, [p_net, q_net])
+
     dx_scale = args.dx_scale
     theta_prior = args.theta_prior
 
@@ -440,7 +442,7 @@ def main():
         output.flush()
 
         # save the models
-        MiscTools.save_models(path_prefix, epoch, digits, save_interval, trained_dir, p_net, q_net, use_cuda)
+        MiscTools.save_trained_models(path_prefix, epoch, digits, save_interval, trained_dir, p_net, q_net, use_cuda)
 
     MiscTools.save_results(output_dir=output_dir, train_results=train_results, val_results=val_results )
 

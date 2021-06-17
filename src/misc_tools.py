@@ -31,12 +31,10 @@ class MiscTools:
                                             image_dims=image_dims, to_permute_for_channels=True)
             return
 
-
     @staticmethod
     def prep_pre_load_images(script, dataset_type, args):
         # Final warning
-        if input(
-            'WARNING This will clear the outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
+        if input('WARNING Will clear the outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
             quit()
 
         start_time = datetime.datetime.now()
@@ -73,7 +71,7 @@ class MiscTools:
             print('\n'.join(val_results), file=val_file)
 
     @staticmethod
-    def save_models(path_prefix, epoch, digits, save_interval, trained_dir, p_net, q_net, use_cuda):
+    def save_trained_models(path_prefix, epoch, digits, save_interval, trained_dir, p_net, q_net, use_cuda):
 
         if path_prefix is not None and (epoch+1) % save_interval == 0:
             epoch_str = str(epoch + 1).zfill(digits)
@@ -90,4 +88,12 @@ class MiscTools:
             if use_cuda:
                 p_net.cuda()
                 q_net.cuda()
+
+    @staticmethod
+    def save_model_specs_to_file(outputs_dir, models):
+        path = os.path.join(outputs_dir, 'models.txt')
+
+        with open(path, 'w') as file:
+            for model in models:
+                print(model, file=file)
 
