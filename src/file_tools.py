@@ -52,7 +52,7 @@ class FileTools:
         return result
 
     @staticmethod
-    def make_datetime_named_archive(base_name: str, format: str, root_dir: str, base_dir: str):
+    def make_datetime_named_archive(base_name: str, format: str, dir_path_to_archive: str):
         """Make archive, name prefixed with current datetime (yyyymmdd_HHMM_).
         For more detail of each parameter, see definition of shutil.make_archive.
 
@@ -65,8 +65,7 @@ class FileTools:
         :param base_name: str, the full path of the file to create, including the base name, minus any format-specific
         extension; datetime will be prefixed to the base name
         :param format: str, the archive format
-        :param root_dir: str, a directory that will be the root directory of the archive
-        :param base_dir: str, the directory where we start archiving from
+        :param dir_path_to_archive: str, the path to the directory that is to be archived
         :returns: name of file
         """
 
@@ -74,6 +73,8 @@ class FileTools:
         dir_path = Path(base_name).parent
         base_name = os.path.join(dir_path, file_name)
 
+        root_dir = Path(dir_path_to_archive).parent
+        base_dir = Path(dir_path_to_archive).name
         # print('\nmake_archive params etc')
         # print('base_name: {}'.format(base_name))
         # print('root_dir: {}'.format(root_dir))
@@ -115,3 +116,4 @@ class FileTools:
         with open(save_path, 'w', encoding='utf-8') as outfile:
             outfile.write(content)
             print('Output saved to {}.'.format(save_path))
+

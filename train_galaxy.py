@@ -441,10 +441,15 @@ def main():
         print(line, file=output)
         output.flush()
 
-        # save the models
-        MiscTools.save_trained_models(path_prefix, epoch, digits, save_interval, trained_dir, p_net, q_net, use_cuda)
+    # save the models
+    # Previously run within epochs cycle (using save_interval) but these can get large. May revert back to that
+    # at some stage. Swapped epochs for num_epochs-1 and save_interval for 1.
+    MiscTools.save_trained_models(path_prefix, num_epochs-1, digits, 1, trained_dir, p_net, q_net, use_cuda)
 
     MiscTools.save_results(output_dir=output_dir, train_results=train_results, val_results=val_results )
+
+    # Create archive of output directory
+    FileTools.make_datetime_named_archive(output_dir, 'zip', output_dir)
 
     end_time = datetime.datetime.now()
     print(f"End : {end_time.strftime('%y%m%d_%H%M%S')}")
