@@ -173,9 +173,13 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
         delta = batch_size*(kl_loss - kl_loss_accum)
         kl_loss_accum += delta/count_accum
 
-        # Reconstruct and save images in first batch of each epoch, as a sample
+        # Reconstruct and save images in first batch of each epoch, as a sample, with rotate and translate ==False
         if iteration_count == 0 and to_save_image_samples and image_dims:
-            MiscTools.export_batch_as_image(data=y_hat,
+            _, _, _, y_hat_for_images = eval_minibatch(x, y, p_net, q_net, rotate=False, translate=False,
+                                                       dx_scale=dx_scale, theta_prior=theta_prior,
+                                                       use_cuda=use_cuda)
+
+            MiscTools.export_batch_as_image(data=y_hat_for_images,
                                             output='{}/images/{}_output.png'.format(output_dir, epoch),
                                             image_dims=image_dims, to_permute_for_channels=True)
 
