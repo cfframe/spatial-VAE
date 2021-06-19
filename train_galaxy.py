@@ -60,7 +60,11 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     # E[p(x|z)]
     r = Variable(x.data.new(batch_size, z_dim).normal_())
     z = z_std*r + z_mu
-    
+    # CFF - to review.  r is a random var from unit variance zero mean Gaus. dist.
+    # BUT we want a sample from z_mu and z_std - try reparametrisation trick?
+    # so 1. sample from r
+    # 2. multiply by sample from z
+
     kl_div = 0
     if rotate:
         # z[0] is the rotation
@@ -118,6 +122,41 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     elbo = log_p_x_g_z - kl_div
 
     return elbo, log_p_x_g_z, kl_div, y_hat
+
+
+def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
+                          augment_rotation=False, z_scale=1, use_cuda=False):
+    batch_size = y.size(0)
+    x = x.expand(batch_size, x.size(0), x.size(1))
+
+    if use_cuda:
+        y = y.cuda()
+
+    # first do inference on the latent variables
+    z_mu, z_logstd = q_net(y.view(batch_size, -1))
+    z_std = torch.exp(z_logstd)
+    z_dim = z_mu.size(1)
+
+    # draw samples from variational posterior to calculate
+    # E[p(x|z)]
+    r = Variable(x.data.new(batch_size, z_dim).normal_())
+    z = z_std * r + z_mu
+
+    if rotate:
+        # z[0] is the rotation so clear that
+        z = z[:, 1:]
+
+    if translate:
+        # z[0, 1] are the translations, so clear these
+        z = z[:, 2:]
+
+    z = z * z_scale
+
+    # reconstruct
+    y_hat = p_net(x.contiguous(), z)
+    y_hat = y_hat.view(batch_size, -1, 3)
+
+    return y_hat
 
 
 def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True,
@@ -209,6 +248,13 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
 
         # Reconstruct and save images in first batch of each epoch, as a sample
         if iteration_count == 0 and to_save_image_samples and image_dims:
+            y_display = minibatch_for_display(x, y, p_net, q_net, rotate=rotate, translate=translate,
+                                   z_scale=z_scale, use_cuda=use_cuda)
+
+            MiscTools.export_batch_as_image(data=y_display,
+                                            output='{}/images/{}_output_dis.png'.format(output_dir, epoch),
+                                            image_dims=image_dims, to_permute_for_channels=True)
+
             MiscTools.export_batch_as_image(data=y_hat,
                                             output='{}/images/{}_output.png'.format(output_dir, epoch),
                                             image_dims=image_dims, to_permute_for_channels=True)
