@@ -320,7 +320,7 @@ def main():
     dataset_type = 'galaxy'
 
     start_time, output_dir, trained_dir, images_dir, num_epochs, num_train_images, val_split, digits\
-        = MiscTools.prep_pre_load_images(os.path.basename(__file__), dataset_type, args)
+        = MiscTools.prep_pre_load_images(dataset_type, args)
 
     # load the images
     print('# loading data...', file=sys.stderr)

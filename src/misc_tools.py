@@ -32,7 +32,7 @@ class MiscTools:
             return
 
     @staticmethod
-    def prep_pre_load_images(script, dataset_type, args):
+    def prep_pre_load_images(dataset_type, args):
         # Final warning
         if input('WARNING Will clear the outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
             quit()
@@ -49,8 +49,7 @@ class MiscTools:
         FileTools.ensure_empty_directory(images_dir)
 
         # Save list of arguments with values
-        FileTools.save_command_args_to_file(script=script, args=vars(args),
-                                            save_path=os.path.join(output_dir, 'command.txt'))
+        FileTools.save_command_args_to_file(args=vars(args), save_path=os.path.join(output_dir, 'command.txt'))
 
         num_epochs = args.num_epochs
         num_train_images = args.num_train_images
