@@ -4,18 +4,21 @@ import argparse
 import datetime
 import numpy as np
 import os
+import spatial_vae.models as models
 import sys
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 import torch.utils.data
 import torchvision
 
-import spatial_vae.models as models
+from PIL import Image
 from src.file_tools import FileTools
 from src.misc_tools import MiscTools
+from src.plot_helper import PlotHelper
+from src.result_columns import ResultColumns
+from torch.autograd import Variable
 
 
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi, use_cuda=False):
@@ -87,6 +90,40 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     return elbo, log_p_x_g_z, kl_div, y_hat
 
 
+def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, z_scale=1, use_cuda=False):
+    batch_size = y.size(0)
+    x = x.expand(batch_size, x.size(0), x.size(1))
+
+    if use_cuda:
+        y = y.cuda()
+
+    # first do inference on the latent variables
+    z_mu, z_logstd = q_net(y.view(batch_size, -1))
+    z_std = torch.exp(z_logstd)
+    z_dim = z_mu.size(1)
+
+    # draw samples from variational posterior to calculate
+    # E[p(x|z)]
+    r = Variable(x.data.new(batch_size, z_dim).normal_())
+    z = z_std * r + z_mu
+
+    if rotate:
+        # z[0] is the rotation so clear that
+        z = z[:, 1:]
+
+    if translate:
+        # z[0, 1] are the translations, so clear these
+        z = z[:, 2:]
+
+    z = z * z_scale
+
+    # reconstruct
+    y_hat = p_net(x.contiguous(), z)
+    y_hat = y_hat.view(batch_size, -1)
+
+    return y_hat
+
+
 def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True,
                 dx_scale=0.1, theta_prior=np.pi,
                 epoch=1, num_epochs=1, N=1, use_cuda=False):
@@ -94,7 +131,7 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
     q_net.train()
 
     count_accum = 0
-    gen_loss_accum = 0
+    bce_loss_accum = 0
     kl_loss_accum = 0
     elbo_accum = 0
 
@@ -113,12 +150,12 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         optim.zero_grad()
 
         elbo = elbo.item()
-        gen_loss = -log_p_x_g_z.item()
+        bce_loss = -log_p_x_g_z.item()
         kl_loss = kl_div.item()
 
         count_accum += batch_size
-        delta = batch_size * (gen_loss - gen_loss_accum)
-        gen_loss_accum += delta / count_accum
+        delta = batch_size * (bce_loss - bce_loss_accum)
+        bce_loss_accum += delta / count_accum
 
         delta = batch_size * (elbo - elbo_accum)
         elbo_accum += delta / count_accum
@@ -127,11 +164,11 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         kl_loss_accum += delta / count_accum
 
         template = '# [{}/{}] training {:.1%}, ELBO={:.5f}, Error={:.5f}, KL={:.5f}'
-        line = template.format(epoch + 1, num_epochs, count_accum / N, elbo_accum, gen_loss_accum, kl_loss_accum)
+        line = template.format(epoch + 1, num_epochs, count_accum / N, elbo_accum, bce_loss_accum, kl_loss_accum)
         print(line, end='\r', file=sys.stderr)
 
     print(' ' * 80, end='\r', file=sys.stderr)
-    return elbo_accum, gen_loss_accum, kl_loss_accum
+    return elbo_accum, bce_loss_accum, kl_loss_accum
 
 
 def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
@@ -143,7 +180,7 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
     q_net.eval()
 
     count_accum = 0
-    gen_loss_accum = 0
+    bce_loss_accum = 0
     kl_loss_accum = 0
     elbo_accum = 0
     iteration_count = -1
@@ -159,12 +196,12 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
                                                           use_cuda=use_cuda)
 
         elbo = elbo.item()
-        gen_loss = -log_p_x_g_z.item()
+        bce_loss = -log_p_x_g_z.item()
         kl_loss = kl_div.item()
 
         count_accum += batch_size
-        delta = batch_size * (gen_loss - gen_loss_accum)
-        gen_loss_accum += delta / count_accum
+        delta = batch_size * (bce_loss - bce_loss_accum)
+        bce_loss_accum += delta / count_accum
 
         delta = batch_size * (elbo - elbo_accum)
         elbo_accum += delta / count_accum
@@ -174,15 +211,18 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
 
         # Reconstruct and save images in first batch of each epoch, as a sample
         if iteration_count == 0 and to_save_image_samples and image_dims:
-            elbo, log_p_x_g_z, kl_div, y_hat = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
-                                                              dx_scale=dx_scale, theta_prior=theta_prior,
-                                                              use_cuda=use_cuda)
+            y_display = minibatch_for_display(x, y, p_net, q_net, rotate=rotate, translate=translate,
+                                              use_cuda=use_cuda)
+
+            MiscTools.export_batch_as_image(data=y_display,
+                                            output='{}/images/{}_output_dis.png'.format(output_dir, epoch),
+                                            image_dims=image_dims, to_permute_for_channels=True)
 
             MiscTools.export_batch_as_image(data=y_hat,
                                             output='{}/images/{}_output.png'.format(output_dir, epoch),
                                             image_dims=image_dims, to_permute_for_channels=True)
 
-    return elbo_accum, gen_loss_accum, kl_loss_accum
+    return elbo_accum, bce_loss_accum, kl_loss_accum
 
 
 def mnist_arguments():
@@ -351,7 +391,7 @@ def main():
 
     # Initialise results bins
     output = sys.stdout
-    header_parts = '\t'.join(['Epoch', 'Date', 'Time', 'Split', 'ELBO', 'General loss', 'KL'])
+    header_parts = '\t'.join(['Epoch', 'ELBO', 'BCE loss', 'KL'])
     print(header_parts, file=output)
 
     train_results = []
@@ -363,23 +403,21 @@ def main():
     for epoch in range(num_epochs):
         epoch_str = str(epoch + 1).zfill(digits)
 
-        elbo_accum, gen_loss_accum, kl_loss_accum = train_epoch(train_iterator, x_coord, p_net, q_net,
+        elbo_accum, bce_loss_accum, kl_loss_accum = train_epoch(train_iterator, x_coord, p_net, q_net,
                                                                 optim, rotate=rotate, translate=translate,
                                                                 dx_scale=dx_scale, theta_prior=theta_prior,
                                                                 epoch=epoch, num_epochs=num_epochs, N=N,
                                                                 use_cuda=use_cuda)
 
-        line = '\t'.join([str(epoch + 1), datetime.datetime.now().strftime('%y%m%d'),
-                          datetime.datetime.now().strftime('%H%M%S'),
-                          'train',
-                          str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
-        train_results.append(line)
+        train_loss = [epoch, elbo_accum, bce_loss_accum, kl_loss_accum]
+        train_results.append(train_loss)
+        line = '\t'.join(list(map(str, train_loss)))
         print(line, file=output)
         output.flush()
 
         # evaluate on the test set
         to_save_image_samples = ((epoch + 1) % save_interval == 0)
-        elbo_accum, gen_loss_accum, kl_loss_accum = eval_model(val_iterator, x_coord, p_net,
+        elbo_accum, bce_loss_accum, kl_loss_accum = eval_model(val_iterator, x_coord, p_net,
                                                                q_net, rotate=rotate, translate=translate,
                                                                dx_scale=dx_scale, theta_prior=theta_prior,
                                                                use_cuda=use_cuda,
@@ -387,11 +425,9 @@ def main():
                                                                image_dims=image_dims,
                                                                epoch=epoch_str, output_dir=output_dir
                                                                )
-        line = '\t'.join([str(epoch + 1), datetime.datetime.now().strftime('%y%m%d'),
-                          datetime.datetime.now().strftime('%H%M%S'),
-                          'validation',
-                          str(elbo_accum), str(gen_loss_accum), str(kl_loss_accum)])
-        val_results.append(line)
+        val_loss = [epoch, elbo_accum, bce_loss_accum, kl_loss_accum]
+        val_results.append(val_loss)
+        line = '\t'.join(list(map(str, val_loss)))
         print(line, file=output)
         output.flush()
 
@@ -400,6 +436,11 @@ def main():
     # at some stage. Swapped epochs for num_epochs-1 and save_interval for 1.
     MiscTools.save_trained_models(path_prefix, num_epochs - 1, digits, 1, trained_dir, p_net, q_net, use_cuda)
 
+    PlotHelper.basic_run_plot(train_results[ResultColumns.ELBO], val_results[ResultColumns.ELBO],
+                              train_results[ResultColumns.KL], val_results[ResultColumns.KL],
+                              train_results[ResultColumns.BCE], val_results[ResultColumns.BCE],
+                              output_dir=output_dir
+                              )
     MiscTools.save_results(output_dir=output_dir, train_results=train_results, val_results=val_results)
 
     # Create archive of output directory

@@ -44,6 +44,7 @@ class MiscTools:
 
         trained_dir = os.path.join(output_dir, 'trained')
         images_dir = os.path.join(output_dir, 'images')
+        FileTools.ensure_empty_directory(output_dir)
         FileTools.ensure_empty_directory(trained_dir)
         FileTools.ensure_empty_directory(images_dir)
 

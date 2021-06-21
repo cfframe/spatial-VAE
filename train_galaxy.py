@@ -126,8 +126,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     return elbo, log_p_x_g_z, kl_div, y_hat
 
 
-def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
-                          augment_rotation=False, z_scale=1, use_cuda=False):
+def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, z_scale=1, use_cuda=False):
     batch_size = y.size(0)
     x = x.expand(batch_size, x.size(0), x.size(1))
 
