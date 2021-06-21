@@ -441,9 +441,8 @@ def main():
 
     train_results = []
     val_results = []
-
-    train_results.append(header_parts)
-    val_results.append(header_parts)
+    train_results_for_file = [header_parts]
+    val_results_for_file = [header_parts]
 
     for epoch in range(num_epochs):
         z_scale = 1
@@ -463,6 +462,7 @@ def main():
         train_loss = [epoch, elbo_accum, bce_loss_accum, kl_loss_accum]
         train_results.append(train_loss)
         line = '\t'.join(list(map(str, train_loss)))
+        train_results_for_file.append(line)
         print(line, file=output)
         output.flush()
 
@@ -481,6 +481,7 @@ def main():
         val_loss = [epoch, elbo_accum, bce_loss_accum, kl_loss_accum]
         val_results.append(val_loss)
         line = '\t'.join(list(map(str, val_loss)))
+        val_results_for_file.append(line)
         print(line, file=output)
         output.flush()
 
@@ -489,12 +490,10 @@ def main():
     # at some stage. Swapped epochs for num_epochs-1 and save_interval for 1.
     MiscTools.save_trained_models(path_prefix, num_epochs-1, digits, 1, trained_dir, p_net, q_net, use_cuda)
 
-    PlotHelper.basic_run_plot(train_results[ResultColumns.ELBO], val_results[ResultColumns.ELBO],
-                              train_results[ResultColumns.KL], val_results[ResultColumns.KL],
-                              train_results[ResultColumns.BCE], val_results[ResultColumns.BCE],
-                              output_dir=output_dir
-                              )
-    MiscTools.save_results(output_dir=output_dir, train_results=train_results, val_results=val_results )
+    PlotHelper.basic_run_plot(train_results, val_results, output_dir=os.path.join(output_dir, 'images'))
+    MiscTools.save_results(output_dir=output_dir,
+                           train_results=train_results_for_file,
+                           val_results=val_results_for_file)
 
     # Create archive of output directory
     FileTools.make_datetime_named_archive(output_dir, 'zip', output_dir)

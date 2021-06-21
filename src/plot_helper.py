@@ -1,7 +1,10 @@
 # plot_helper.py
 
 import matplotlib.pyplot as plt
+import numpy as np
 import os
+
+from src.result_columns import ResultColumns
 
 
 class PlotHelper:
@@ -17,7 +20,6 @@ class PlotHelper:
         :param legend_location: str -- location of legend on the Figure e.g. 'upper right'
         :param output_dir: str -- target directory for saving plot
         """
-
         plt.plot(train_data, color='b', label='Training')
         plt.plot(validation_data, color='g', label='Validation')
         plt.title(title)
@@ -30,31 +32,36 @@ class PlotHelper:
         # If use plt.show() before saving, then saved figure is blank. Works ok other way round.
         plt.savefig(target_path)
 
-        return plt
+        # plt.show()
 
     @staticmethod
-    def basic_run_plot(elbo_train, elbo_val, kl_train, kl_val, bce_loss_train, bce_loss_val, output_dir):
+    def basic_run_plot(train_results, val_results, output_dir):
+        train_arr = np.asarray(train_results)
+        val_arr = np.asarray(val_results)
 
+        plt.figure()
         PlotHelper.basic_train_val_plot_and_save(
             # style='seaborn',
             title='ELBO',
-            train_data=elbo_train,
-            validation_data=elbo_val,
+            train_data=train_arr[:, ResultColumns.ELBO],
+            validation_data=val_arr[:, ResultColumns.ELBO],
             legend_location='lower right',
             output_dir=output_dir)
 
+        plt.figure()
         PlotHelper.basic_train_val_plot_and_save(
             # style='seaborn',
             title='KL Divergence',
-            train_data=kl_train,
-            validation_data=kl_val,
+            train_data=train_arr[:, ResultColumns.KL],
+            validation_data=val_arr[:, ResultColumns.KL],
             legend_location='upper right',
             output_dir=output_dir)
 
+        plt.figure()
         PlotHelper.basic_train_val_plot_and_save(
             # style='seaborn',
             title='BCE Loss',
-            train_data=bce_loss_train,
-            validation_data=bce_loss_val,
+            train_data=train_arr[:, ResultColumns.BCE],
+            validation_data=val_arr[:, ResultColumns.BCE],
             legend_location='upper right',
             output_dir=output_dir)

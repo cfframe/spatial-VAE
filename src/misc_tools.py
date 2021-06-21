@@ -66,10 +66,10 @@ class MiscTools:
         val_results_path = os.path.join(output_dir, 'val.txt')
 
         with open(train_results_path, 'w') as train_file:
-            print('\n'.join(list(map(str, train_results))), file=train_file)
+            print('\n'.join(train_results), file=train_file)
 
         with open(val_results_path, 'w') as val_file:
-            print('\n'.join(list(map(str, val_results))), file=val_file)
+            print('\n'.join(val_results), file=val_file)
 
     @staticmethod
     def save_trained_models(path_prefix, epoch, digits, save_interval, trained_dir, p_net, q_net, use_cuda):
