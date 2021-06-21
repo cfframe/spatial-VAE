@@ -68,7 +68,7 @@ class FileTools:
         :param dir_path_to_archive: str, the path to the directory that is to be archived
         :returns: name of file
         """
-
+        print('Archiving files...')
         file_name = datetime.datetime.now().strftime('%y%m%d_%H%M_') + Path(base_name).name
         dir_path = Path(base_name).parent
         base_name = os.path.join(dir_path, file_name)
