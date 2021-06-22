@@ -13,19 +13,19 @@ class MiscTools:
     """Miscellaneous utilities for this repo"""
 
     @staticmethod
-    def image_prefix(args):
+    def save_label(args):
         value_args = {'z_dim': 'z',
                       'p_num_layers': 'pnl',
                       'q_num_layers': 'qnl',
                       'num_layers': 'nl',
                       'num_epochs': 'ep'}
-        prefix = args.save_prefix + '_'
+        label = args.save_prefix + '_'
         args = vars(args)
         for arg in args:
             if arg in value_args:
-                prefix += value_args[arg] + str(args[arg])
+                label += value_args[arg] + str(args[arg])
 
-        return prefix
+        return label
 
     @staticmethod
     def export_batch_as_image(data, output, image_dims, to_permute_for_channels=True):
@@ -39,9 +39,9 @@ class MiscTools:
         save_image(images.cpu(), output, nrow=rows, padding=3, pad_value=0.5)
 
     @staticmethod
-    def sample_images(iterator, image_dims=None, name='sample', prefix='', output_dir='outputs'):
+    def sample_images(iterator, image_dims=None, name='sample', save_label='', output_dir='outputs'):
         for y, in iterator:
-            MiscTools.export_batch_as_image(data=y, output='{}/images/_{}_{}.png'.format(output_dir, prefix, name),
+            MiscTools.export_batch_as_image(data=y, output='{}/images/_{}_{}.png'.format(output_dir, name, save_label),
                                             image_dims=image_dims, to_permute_for_channels=True)
             return
 
