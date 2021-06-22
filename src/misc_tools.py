@@ -3,11 +3,9 @@
 import datetime
 import numpy as np
 import os
-import shutil
 import torch
 
 from src.file_tools import FileTools
-from pathlib import Path
 from torchvision.utils import save_image
 
 
@@ -15,19 +13,35 @@ class MiscTools:
     """Miscellaneous utilities for this repo"""
 
     @staticmethod
+    def image_prefix(args):
+        value_args = {'z_dim': 'z',
+                      'p_num_layers': 'pnl',
+                      'q_num_layers': 'qnl',
+                      'num_layers': 'nl',
+                      'num_epochs': 'ep'}
+        prefix = args.save_prefix + '_'
+        args = vars(args)
+        for arg in args:
+            if arg in value_args:
+                prefix += value_args[arg] + str(args[arg])
+
+        return prefix
+
+    @staticmethod
     def export_batch_as_image(data, output, image_dims, to_permute_for_channels=True):
         # Re-cast data view to original image dimensions
         images = data.view(data.size()[0], *image_dims, -1)
         if to_permute_for_channels:
             images = images.permute(0, 3, 1, 2)
-        # Assume square of images, so no. of rows is square root of number of images
+        # Assume square of images, so no. of rows is square root of number of images. If image count not a square number
+        # then some boxes will be blank
         rows = int(data.size()[0] ** 0.5)
         save_image(images.cpu(), output, nrow=rows, padding=3, pad_value=0.5)
 
     @staticmethod
     def sample_images(iterator, image_dims=None, name='sample', prefix='', output_dir='outputs'):
         for y, in iterator:
-            MiscTools.export_batch_as_image(data=y, output='{}/images/{}_{}.png'.format(output_dir, prefix, name),
+            MiscTools.export_batch_as_image(data=y, output='{}/images/_{}_{}.png'.format(output_dir, prefix, name),
                                             image_dims=image_dims, to_permute_for_channels=True)
             return
 

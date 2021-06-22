@@ -175,7 +175,8 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
                dx_scale=0.1, theta_prior=np.pi, use_cuda=False,
                to_save_image_samples=False,
                image_dims=None, epoch='0',
-               output_dir='outputs'):
+               output_dir='outputs',
+               image_prefix=''):
     p_net.eval()
     q_net.eval()
 
@@ -215,11 +216,11 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
                                               use_cuda=use_cuda)
 
             MiscTools.export_batch_as_image(data=y_display,
-                                            output='{}/images/{}_output_dis.png'.format(output_dir, epoch),
+                                            output='{}/images/{}_{}_dis.png'.format(output_dir, image_prefix, epoch),
                                             image_dims=image_dims, to_permute_for_channels=True)
 
             MiscTools.export_batch_as_image(data=y_hat,
-                                            output='{}/images/{}_output.png'.format(output_dir, epoch),
+                                            output='{}/images/{}_{}.png'.format(output_dir, image_prefix, epoch),
                                             image_dims=image_dims, to_permute_for_channels=True)
 
     return elbo_accum, bce_loss_accum, kl_loss_accum
@@ -385,9 +386,10 @@ def main():
     val_iterator = torch.utils.data.DataLoader(data_test, batch_size=minibatch_size)
 
     path_prefix = args.save_prefix
+    image_prefix = MiscTools.image_prefix(args)
     save_interval = args.save_interval
 
-    MiscTools.sample_images(iterator=val_iterator, image_dims=image_dims, output_dir=output_dir)
+    MiscTools.sample_images(iterator=val_iterator, image_dims=image_dims, output_dir=output_dir, prefix=image_prefix)
 
     # Initialise results bins
     output = sys.stdout
@@ -423,7 +425,8 @@ def main():
                                                                use_cuda=use_cuda,
                                                                to_save_image_samples=to_save_image_samples,
                                                                image_dims=image_dims,
-                                                               epoch=epoch_str, output_dir=output_dir
+                                                               epoch=epoch_str, output_dir=output_dir,
+                                                               image_prefix=image_prefix
                                                                )
         val_loss = [epoch, elbo_accum, bce_loss_accum, kl_loss_accum]
         val_results.append(val_loss)
