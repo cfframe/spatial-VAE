@@ -155,8 +155,7 @@ def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, z_sca
 
     # reconstruct
     y_hat = p_net(x.contiguous(), z)
-    # cff old y_hat = y_hat.view(batch_size, -1, 3)
-    y_hat = y_hat.view(batch_size, 3, -1)
+    y_hat = y_hat.view(batch_size, -1, 3)
 
     return y_hat
 
@@ -254,35 +253,14 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
             y_display = minibatch_for_display(x, y, p_net, q_net, rotate=rotate, translate=translate,
                                               z_scale=z_scale, use_cuda=use_cuda)
 
-            # MiscTools.export_batch_as_image(data=y_display,
-            #                                 output='{}/images/{}_dis_{}.png'.format(output_dir, epoch, save_label),
-            #                                 image_dims=image_dims, to_permute_for_channels=True)
-
-            # TRIAL START
-            data = y_display
-            output = '{}/images/{}_dis_{}.png'.format(output_dir, epoch, save_label)
-            # image_dims = image_dims
-            to_permute_for_channels = False
-
-            # def export_batch_as_image(data, output, image_dims, to_permute_for_channels=True):
-            # Re-cast data view to original image dimensions
-            # cff old images = data.view(data.size()[0], *image_dims, -1)
-            images = data.view(data.size()[0], -1, *image_dims)
-            if to_permute_for_channels:
-                images = images.permute(0, 3, 1, 2)
-            # Assume square of images, so no. of rows is square root of number of images. If image count not a square number
-            # then some boxes will be blank
-            rows = int(data.size()[0] ** 0.5)
-
-            from torchvision.utils import save_image
-            save_image(images.cpu(), output, nrow=rows, padding=3, pad_value=0.5)
-
-            # TRIAL PART END
+            MiscTools.export_batch_as_image(data=y_display,
+                                            output='{}/images/{}_dis_{}.png'.format(output_dir, epoch, save_label),
+                                            image_dims=image_dims, to_permute_for_channels=True)
 
             MiscTools.export_batch_as_image(data=y_hat,
                                             output='{}/images/{}_{}.png'.format(output_dir, epoch, save_label),
                                             image_dims=image_dims, to_permute_for_channels=True)
-            # TRIAL END
+
     return elbo_accum, bce_loss_accum, kl_loss_accum
 
 
@@ -368,9 +346,9 @@ def main():
     y_val = images_val.view(-1, n*m, 3)
 
     # # x coordinate array
-    row_grid = np.linspace(-1, 1, m)
-    column_grid = np.linspace(1, -1, n)
-    x0, x1 = np.meshgrid(row_grid, column_grid)
+    xgrid = np.linspace(-1, 1, m)
+    ygrid = np.linspace(1, -1, n)
+    x0, x1 = np.meshgrid(xgrid, ygrid)
     x_coord = np.stack([x0.ravel(), x1.ravel()], 1)
     x_coord = torch.from_numpy(x_coord).float()
 
