@@ -30,6 +30,8 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
     batch_size = y.size(0)
     x = x.expand(batch_size, x.size(0), x.size(1))
+
+    # Assumes square image of side n
     n = int(np.sqrt(y.size(1)))
 
     # augment training by randomly rotating images by offset
@@ -60,12 +62,10 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
     # draw samples from variational posterior to calculate
     # E[p(x|z)]
+    # 1. r is a random sample from unit variance zero mean Gaus. dist.
+    # We want a sample from z_mu and z_std - the above is the 'reparametrisation trick'
     r = Variable(x.data.new(batch_size, z_dim).normal_())
     z = z_std*r + z_mu
-    # CFF - to review.  r is a random var from unit variance zero mean Gaus. dist.
-    # BUT we want a sample from z_mu and z_std - try reparametrisation trick?
-    # so 1. sample from r
-    # 2. multiply by sample from z
 
     kl_div = 0
     if rotate:
@@ -162,7 +162,7 @@ def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, z_sca
 
 def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True,
                 dx_scale=0.1, theta_prior=np.pi, augment_rotation=False, z_scale=1,
-                epoch=1, num_epochs=1, N=1, use_cuda=False):
+                epoch=1, num_epochs=1, train_images_len=1, use_cuda=False):
     p_net.train()
     q_net.train()
 
@@ -201,7 +201,7 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         kl_loss_accum += delta/count_accum
 
         template = '# [{}/{}] training {:.1%}, ELBO={:.5f}, Error={:.5f}, KL={:.5f}'
-        line = template.format(epoch+1, num_epochs, count_accum/N, elbo_accum, bce_loss_accum, kl_loss_accum)
+        line = template.format(epoch + 1, num_epochs, count_accum / train_images_len, elbo_accum, bce_loss_accum, kl_loss_accum)
         print(line, end='\r', file=sys.stderr)
 
     print(' '*80, end='\r', file=sys.stderr)
@@ -418,7 +418,7 @@ def main():
 
     print('# using priors: theta={}, dx={}'.format(theta_prior, dx_scale), file=sys.stderr)
 
-    N = len(images_train)
+    train_images_len = len(images_train)
     params = list(p_net.parameters()) + list(q_net.parameters())
 
     lr = args.learning_rate
@@ -459,7 +459,8 @@ def main():
                                                                 dx_scale=dx_scale, theta_prior=theta_prior,
                                                                 augment_rotation=augment_rotation,
                                                                 z_scale=z_scale,
-                                                                epoch=epoch, num_epochs=num_epochs, N=N,
+                                                                epoch=epoch, num_epochs=num_epochs,
+                                                                train_images_len=train_images_len,
                                                                 use_cuda=use_cuda)
 
         train_loss = [epoch, elbo_accum, bce_loss_accum, kl_loss_accum]
