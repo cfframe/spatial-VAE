@@ -229,7 +229,7 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
 def mnist_arguments():
     parser = argparse.ArgumentParser('Train spatial-VAE on MNIST datasets')
 
-    parser.add_argument('--dataset', choices=['mnist', 'mnist-rotated', 'mnist-rotated-translated'],
+    parser.add_argument('--dataset', choices=['mnist', 'mnist-rotated', 'mnist-rotated-translated', 'galaxy'],
                         default='mnist-rotated-translated',
                         help='which MNIST datset to train/validate on (default: mnist-rotated-translated)')
 
@@ -292,12 +292,19 @@ def main():
         images_train = np.load('data/mnist_rotated/images_train.npy')
         images_test = np.load('data/mnist_rotated/images_test.npy')
 
+    elif args.dataset == 'galaxy':
+        print('# training on mono-chromed galaxy_zoo', file=sys.stderr)
+        images_train = np.load('data/galaxy_zoo/galaxy_zoo_train.npy')
+        images_train = np.mean(images_train, axis=3)
+        images_test = np.load('data/galaxy_zoo/galaxy_zoo_test.npy')
+        images_test = np.mean(images_test, axis=3)
     else:
         print('# training on rotated and translated MNIST', file=sys.stderr)
         images_train = np.load('data/mnist_rotated_translated/images_train.npy')
         images_test = np.load('data/mnist_rotated_translated/images_test.npy')
 
-    n = m = 28
+    # n = m = 28
+    n, m = images_train.shape[1:3]
     image_dims = [n, m]
 
     images_train = torch.from_numpy(images_train).float() / 255
