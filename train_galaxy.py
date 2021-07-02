@@ -27,7 +27,6 @@ from torch.autograd import Variable
 
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
                    augment_rotation=False, z_scale=1, use_cuda=False):
-
     batch_size = y.size(0)
     x = x.expand(batch_size, x.size(0), x.size(1))
 
@@ -41,13 +40,13 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
         # in order to encourage robustness of the inference network
         # randomly rotate the observed image before doing inference
         y_rot = y.clone()
-        offset = np.random.uniform(0, 2*np.pi, size=batch_size)
+        offset = np.random.uniform(0, 2 * np.pi, size=batch_size)
         if rotate < 1:
             r = np.random.binomial(1, p=rotate, size=batch_size)
             offset *= r
         for i in range(batch_size):
             im = Image.fromarray(y[i].view(n, n, 3).cpu().numpy())
-            im = im.rotate(360*offset[i]/2/np.pi, resample=Image.BICUBIC)
+            im = im.rotate(360 * offset[i] / 2 / np.pi, resample=Image.BICUBIC)
             im = torch.from_numpy(np.array(im, copy=False)).to(y.device)
             y_rot[i] = im.view(-1, 3)
 
@@ -65,7 +64,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     # 1. r is a random sample from unit variance zero mean Gaus. dist.
     # We want a sample from z_mu and z_std - the above is the 'reparametrisation trick'
     r = Variable(x.data.new(batch_size, z_dim).normal_())
-    z = z_std*r + z_mu
+    z = z_std * r + z_mu
 
     kl_div = 0
     if rotate:
@@ -94,33 +93,33 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
         # use modified KL for rotation with no penalty on mean
         sigma = theta_prior
-        kl_div = -theta_logstd + np.log(sigma) + theta_std**2/2/sigma**2 - 0.5
+        kl_div = -theta_logstd + np.log(sigma) + theta_std ** 2 / 2 / sigma ** 2 - 0.5
 
     if translate:
         # z[0, 1] are the translations
         dx_mu = z_mu[:, :2]
         dx_std = z_std[:, :2]
         dx_logstd = z_logstd[:, :2]
-        dx = z[:, :2]*dx_scale  # scale dx by standard deviation
+        dx = z[:, :2] * dx_scale  # scale dx by standard deviation
         dx = dx.unsqueeze(1)
         z = z[:, 2:]
 
         x = x + dx  # translate coordinates
 
-    z = z*z_scale
+    z = z * z_scale
 
     # reconstruct
     y_hat = p_net(x.contiguous(), z)
     y_hat = y_hat.view(batch_size, -1, 3)
 
-    size = y.size(1)*3
+    size = y.size(1) * 3
     log_p_x_g_z = -F.binary_cross_entropy_with_logits(y_hat, y) * size
 
     # unit normal prior over z and translation
-    z_kl = -z_logstd + 0.5*z_std**2 + 0.5*z_mu**2 - 0.5
+    z_kl = -z_logstd + 0.5 * z_std ** 2 + 0.5 * z_mu ** 2 - 0.5
     kl_div = kl_div + torch.sum(z_kl, 1)
     kl_div = kl_div.mean()
-    
+
     elbo = log_p_x_g_z - kl_div
 
     return elbo, log_p_x_g_z, kl_div, y_hat
@@ -177,9 +176,9 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         y = Variable(y)
 
         elbo, log_p_x_g_z, kl_div, _ = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
-                                                   dx_scale=dx_scale, theta_prior=theta_prior,
-                                                   augment_rotation=augment_rotation, z_scale=z_scale,
-                                                   use_cuda=use_cuda)
+                                                      dx_scale=dx_scale, theta_prior=theta_prior,
+                                                      augment_rotation=augment_rotation, z_scale=z_scale,
+                                                      use_cuda=use_cuda)
 
         loss = -elbo
         loss.backward()
@@ -191,20 +190,21 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         kl_loss = kl_div.item()
 
         count_accum += batch_size
-        delta = batch_size*(bce_loss - bce_loss_accum)
-        bce_loss_accum += delta/count_accum
+        delta = batch_size * (bce_loss - bce_loss_accum)
+        bce_loss_accum += delta / count_accum
 
-        delta = batch_size*(elbo - elbo_accum)
-        elbo_accum += delta/count_accum
+        delta = batch_size * (elbo - elbo_accum)
+        elbo_accum += delta / count_accum
 
-        delta = batch_size*(kl_loss - kl_loss_accum)
-        kl_loss_accum += delta/count_accum
+        delta = batch_size * (kl_loss - kl_loss_accum)
+        kl_loss_accum += delta / count_accum
 
         template = '# [{}/{}] training {:.1%}, ELBO={:.5f}, Error={:.5f}, KL={:.5f}'
-        line = template.format(epoch + 1, num_epochs, count_accum / train_images_len, elbo_accum, bce_loss_accum, kl_loss_accum)
+        line = template.format(epoch + 1, num_epochs, count_accum / train_images_len, elbo_accum, bce_loss_accum,
+                               kl_loss_accum)
         print(line, end='\r', file=sys.stderr)
 
-    print(' '*80, end='\r', file=sys.stderr)
+    print(' ' * 80, end='\r', file=sys.stderr)
     return elbo_accum, bce_loss_accum, kl_loss_accum
 
 
@@ -214,7 +214,6 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
                image_dims=None, epoch='0',
                output_dir='outputs',
                save_label=''):
-
     p_net.eval()
     q_net.eval()
 
@@ -239,14 +238,14 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
         kl_loss = kl_div.item()
 
         count_accum += batch_size
-        delta = batch_size*(gen_loss - bce_loss_accum)
-        bce_loss_accum += delta/count_accum
+        delta = batch_size * (gen_loss - bce_loss_accum)
+        bce_loss_accum += delta / count_accum
 
-        delta = batch_size*(elbo - elbo_accum)
-        elbo_accum += delta/count_accum
+        delta = batch_size * (elbo - elbo_accum)
+        elbo_accum += delta / count_accum
 
-        delta = batch_size*(kl_loss - kl_loss_accum)
-        kl_loss_accum += delta/count_accum
+        delta = batch_size * (kl_loss - kl_loss_accum)
+        kl_loss_accum += delta / count_accum
 
         # Reconstruct and save images in first batch of each epoch, as a sample
         if iteration_count == 0 and to_save_image_samples and image_dims:
@@ -301,8 +300,10 @@ def galaxy_arguments():
     parser.add_argument('-l', '--learning-rate', type=float, default=1e-4, help='learning rate (default: 0.0001)')
     parser.add_argument('--minibatch-size', type=int, default=100, help='minibatch size (default: 100)')
 
-    parser.add_argument('--augment-rotation', action='store_true', help='use data augmentation by randomly rotating images before inference')
-    parser.add_argument('--z-delay', type=int, default=0, help='delay using unstructured latent variables for this many training epochs (default: 0)')
+    parser.add_argument('--augment-rotation', action='store_true',
+                        help='use data augmentation by randomly rotating images before inference')
+    parser.add_argument('--z-delay', type=int, default=0,
+                        help='delay using unstructured latent variables for this many training epochs (default: 0)')
 
     parser.add_argument('--save-prefix', help='path prefix to save models (optional)')
     parser.add_argument('--save-interval', default=10, type=int, help='save frequency in epochs (default: 10)')
@@ -310,17 +311,17 @@ def galaxy_arguments():
 
     parser.add_argument('-d', '--device', type=int, default=-2, help='compute device to use')
     parser.add_argument('--num-train-images', type=int, default=0, help='number of training images (default: 0 = all)')
-    parser.add_argument('--val-split', type=int, default=50, help='% split of training images for validation instead of training (default: 50)')
+    parser.add_argument('--val-split', type=int, default=50,
+                        help='% split of training images for validation instead of training (default: 50)')
 
     return parser.parse_args()
 
 
 def main():
-
     args = galaxy_arguments()
     dataset_type = 'galaxy'
 
-    start_time, output_dir, trained_dir, images_dir, num_epochs, num_train_images, val_split, digits\
+    start_time, output_dir, trained_dir, images_dir, num_epochs, num_train_images, val_split, digits \
         = MiscTools.prep_pre_load_images(dataset_type, args)
 
     # load the images
@@ -340,10 +341,10 @@ def main():
     n, m = images_train.shape[1:3]
     image_dims = [n, m]
 
-    images_train = torch.from_numpy(images_train).float()/255
-    images_val = torch.from_numpy(images_val).float()/255
-    y_train = images_train.view(-1, n*m, 3)
-    y_val = images_val.view(-1, n*m, 3)
+    images_train = torch.from_numpy(images_train).float() / 255
+    images_val = torch.from_numpy(images_val).float() / 255
+    y_train = images_train.view(-1, n * m, 3)
+    y_val = images_val.view(-1, n * m, 3)
 
     # # x coordinate array
     xgrid = np.linspace(-1, 1, m)
@@ -384,13 +385,13 @@ def main():
     # Build models
     if args.vanilla:
         print('# using the vanilla MLP generator architecture', file=sys.stderr)
-        n_out = 3*n*m
+        n_out = 3 * n * m
         p_net = models.VanillaGenerator(n_out, z_dim, hidden_dim, num_layers=num_layers, activation=activation)
         inf_dim = z_dim
         rotate = False
         translate = False
     else:
-        n_out = 3 
+        n_out = 3
         print('# using the spatial generator architecture', file=sys.stderr)
         rotate = not args.no_rotate
         translate = not args.no_translate
@@ -405,7 +406,7 @@ def main():
 
     num_layers = args.q_num_layers
     hidden_dim = args.q_hidden_dim
-    q_net = models.InferenceNetwork(3*n*m, inf_dim, hidden_dim, num_layers=num_layers, activation=activation)
+    q_net = models.InferenceNetwork(3 * n * m, inf_dim, hidden_dim, num_layers=num_layers, activation=activation)
 
     if use_cuda:
         p_net.cuda()
@@ -471,7 +472,7 @@ def main():
         output.flush()
 
         # evaluate on the validation set
-        to_save_image_samples = ((epoch+1) % save_interval == 0)
+        to_save_image_samples = ((epoch + 1) % save_interval == 0)
         elbo_accum, bce_loss_accum, kl_loss_accum = eval_model(val_iterator, x_coord, p_net,
                                                                q_net, rotate=rotate, translate=translate,
                                                                dx_scale=dx_scale, theta_prior=theta_prior,
@@ -493,7 +494,7 @@ def main():
     # save the models
     # Previously run within epochs cycle (using save_interval) but these can get large. May revert back to that
     # at some stage. Swapped epochs for num_epochs-1 and save_interval for 1.
-    MiscTools.save_trained_models(path_prefix, num_epochs-1, digits, 1, trained_dir, p_net, q_net, use_cuda)
+    MiscTools.save_trained_models(path_prefix, num_epochs - 1, digits, 1, trained_dir, p_net, q_net, use_cuda)
 
     PlotHelper.basic_run_plot(train_results, val_results, output_dir=os.path.join(output_dir, 'images'))
     MiscTools.save_results(output_dir=output_dir,
