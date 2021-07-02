@@ -45,9 +45,12 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
             r = np.random.binomial(1, p=rotate, size=batch_size)
             offset *= r
         for i in range(batch_size):
-            im = Image.fromarray(y[i].view(n, n, 3).cpu().numpy())
+            # PIL doesn't support RGB images with values of type float - it assumes they are uint8 in range [0, 255]
+            # ...So convert to that ...
+            im = Image.fromarray((y[i].view(n, n, 3).cpu().numpy() * 255).astype(np.uint8))
             im = im.rotate(360 * offset[i] / 2 / np.pi, resample=Image.BICUBIC)
-            im = torch.from_numpy(np.array(im, copy=False)).to(y.device)
+            # ... and reverse that conversion after doing the rotation
+            im = torch.from_numpy(np.array(im, copy=False).astype(float) / 255).to(y.device)
             y_rot[i] = im.view(-1, 3)
 
     if use_cuda:
