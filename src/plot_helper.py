@@ -11,10 +11,11 @@ class PlotHelper:
     """Utilities for plotting graphs"""
 
     @staticmethod
-    def basic_train_val_plot_and_save(title, train_data, validation_data, legend_location, output_dir):
+    def basic_train_val_plot_and_save(title, y_label, train_data, validation_data, legend_location, output_dir):
         """Plot pairs of datasets
 
         :param title: str -- figure title, used as base for saved file name
+        :param y_label: str -- y-axis label
         :param train_data: dataset -- training results
         :param validation_data: dataset -- validation results
         :param legend_location: str -- location of legend on the Figure e.g. 'upper right'
@@ -23,7 +24,7 @@ class PlotHelper:
         plt.plot(train_data, color='b', label='Training')
         plt.plot(validation_data, color='g', label='Validation')
         plt.title(title)
-        plt.ylabel('Loss')
+        plt.ylabel(y_label)
         plt.xlabel('Epoch')
         plt.legend(['Training', 'Validation'], loc=legend_location)
         plt.grid()
@@ -43,6 +44,7 @@ class PlotHelper:
         PlotHelper.basic_train_val_plot_and_save(
             # style='seaborn',
             title='ELBO',
+            y_label='ELBO',
             train_data=train_arr[:, ResultColumns.ELBO],
             validation_data=val_arr[:, ResultColumns.ELBO],
             legend_location='lower right',
@@ -52,6 +54,7 @@ class PlotHelper:
         PlotHelper.basic_train_val_plot_and_save(
             # style='seaborn',
             title='KL Divergence',
+            y_label='KL Divergence',
             train_data=train_arr[:, ResultColumns.KL],
             validation_data=val_arr[:, ResultColumns.KL],
             legend_location='upper right',
@@ -61,6 +64,7 @@ class PlotHelper:
         PlotHelper.basic_train_val_plot_and_save(
             # style='seaborn',
             title='BCE Loss',
+            y_label='BCE Loss',
             train_data=train_arr[:, ResultColumns.BCE],
             validation_data=val_arr[:, ResultColumns.BCE],
             legend_location='upper right',
