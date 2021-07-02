@@ -334,7 +334,7 @@ def main():
     # load the images
     print('# loading data...', file=sys.stderr)
     images_train = np.load(args.train_path)
-    # images_test = np.load(args.test_path)
+    images_val = np.load(args.test_path)
 
     channels = 3
     if args.make_mono:
@@ -343,20 +343,23 @@ def main():
         images_train = np.mean(images_train, axis=3)
         channels = 1
 
-    # num_train_images enables a quick litmus test with fewer images
     np.random.shuffle(images_train)
+    # num_train_images enables a quick litmus test with fewer images
     if num_train_images > 0:
         images_train = images_train[:num_train_images]
+        images_val = images_val[:num_train_images]
 
-    num_val_images = int(val_split * len(images_train) / 100)
-    images_val = images_train[:num_val_images]
-    images_train = images_train[num_val_images:]
+    # COMMENT OUT below - revert back to using test set for validation
+    # num_val_images = int(val_split * len(images_train) / 100)
+    # images_val = images_train[:num_val_images]
+    # images_train = images_train[num_val_images:]
 
     image_rows, image_cols = images_train.shape[1:3]
     image_dims = [image_rows, image_cols]
 
     images_train = torch.from_numpy(images_train).float() / 255
     images_val = torch.from_numpy(images_val).float() / 255
+
     y_train = images_train.view(-1, image_rows * image_cols, channels)
     y_val = images_val.view(-1, image_rows * image_cols, channels)
 
