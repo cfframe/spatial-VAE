@@ -28,6 +28,7 @@ from torch.autograd import Variable
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
                    augment_rotation=False, z_scale=1, use_cuda=False):
     batch_size = y.size(0)
+    channels = y.size(2)
     x = x.expand(batch_size, x.size(0), x.size(1))
 
     # Assumes square image of side n
@@ -47,11 +48,11 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
         for i in range(batch_size):
             # PIL doesn't support RGB images with values of type float - it assumes they are uint8 in range [0, 255]
             # ...So convert to that ...
-            im = Image.fromarray((y[i].view(n, n, 3).cpu().numpy() * 255).astype(np.uint8))
+            im = Image.fromarray((y[i].view(n, n, channels).cpu().numpy() * 255).astype(np.uint8))
             im = im.rotate(360 * offset[i] / 2 / np.pi, resample=Image.BICUBIC)
             # ... and reverse that conversion after doing the rotation
             im = torch.from_numpy(np.array(im, copy=False).astype(float) / 255).to(y.device)
-            y_rot[i] = im.view(-1, 3)
+            y_rot[i] = im.view(-1, channels)
 
     if use_cuda:
         y = y.cuda()
@@ -113,9 +114,9 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
     # reconstruct
     y_hat = p_net(x.contiguous(), z)
-    y_hat = y_hat.view(batch_size, -1, 3)
+    y_hat = y_hat.view(batch_size, -1, channels)
 
-    size = y.size(1) * 3
+    size = y.size(1) * channels
     log_p_x_g_z = -F.binary_cross_entropy_with_logits(y_hat, y) * size
 
     # unit normal prior over z and translation
@@ -130,6 +131,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
 def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, z_scale=1, use_cuda=False):
     batch_size = y.size(0)
+    channels = y.size(2)
     x = x.expand(batch_size, x.size(0), x.size(1))
 
     if use_cuda:
@@ -157,7 +159,7 @@ def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, z_sca
 
     # reconstruct
     y_hat = p_net(x.contiguous(), z)
-    y_hat = y_hat.view(batch_size, -1, 3)
+    y_hat = y_hat.view(batch_size, -1, channels)
 
     return y_hat
 
@@ -316,6 +318,8 @@ def galaxy_arguments():
     parser.add_argument('--num-train-images', type=int, default=0, help='number of training images (default: 0 = all)')
     parser.add_argument('--val-split', type=int, default=50,
                         help='% split of training images for validation instead of training (default: 50)')
+    parser.add_argument('--make-mono', action='store_true',
+                        help='convert rbg images to monochrome')
 
     return parser.parse_args()
 
@@ -332,6 +336,13 @@ def main():
     images_train = np.load(args.train_path)
     # images_test = np.load(args.test_path)
 
+    channels = 3
+    if args.make_mono:
+        # Convert to grayscale. Not for human perception, so just take a simple mean across the channels
+        # Shape is (image-count, rows, columns, channels)
+        images_train = np.mean(images_train, axis=3)
+        channels = 1
+
     # num_train_images enables a quick litmus test with fewer images
     np.random.shuffle(images_train)
     if num_train_images > 0:
@@ -341,17 +352,17 @@ def main():
     images_val = images_train[:num_val_images]
     images_train = images_train[num_val_images:]
 
-    n, m = images_train.shape[1:3]
-    image_dims = [n, m]
+    image_rows, image_cols = images_train.shape[1:3]
+    image_dims = [image_rows, image_cols]
 
     images_train = torch.from_numpy(images_train).float() / 255
     images_val = torch.from_numpy(images_val).float() / 255
-    y_train = images_train.view(-1, n * m, 3)
-    y_val = images_val.view(-1, n * m, 3)
+    y_train = images_train.view(-1, image_rows * image_cols, channels)
+    y_val = images_val.view(-1, image_rows * image_cols, channels)
 
     # # x coordinate array
-    xgrid = np.linspace(-1, 1, m)
-    ygrid = np.linspace(1, -1, n)
+    xgrid = np.linspace(-1, 1, image_cols)
+    ygrid = np.linspace(1, -1, image_rows)
     x0, x1 = np.meshgrid(xgrid, ygrid)
     x_coord = np.stack([x0.ravel(), x1.ravel()], 1)
     x_coord = torch.from_numpy(x_coord).float()
@@ -388,13 +399,13 @@ def main():
     # Build models
     if args.vanilla:
         print('# using the vanilla MLP generator architecture', file=sys.stderr)
-        n_out = 3 * n * m
+        n_out = channels * image_rows * image_cols
         p_net = models.VanillaGenerator(n_out, z_dim, hidden_dim, num_layers=num_layers, activation=activation)
         inf_dim = z_dim
         rotate = False
         translate = False
     else:
-        n_out = 3
+        n_out = channels
         print('# using the spatial generator architecture', file=sys.stderr)
         rotate = not args.no_rotate
         translate = not args.no_translate
@@ -409,7 +420,7 @@ def main():
 
     num_layers = args.q_num_layers
     hidden_dim = args.q_hidden_dim
-    q_net = models.InferenceNetwork(3 * n * m, inf_dim, hidden_dim, num_layers=num_layers, activation=activation)
+    q_net = models.InferenceNetwork(channels * image_rows * image_cols, inf_dim, hidden_dim, num_layers=num_layers, activation=activation)
 
     if use_cuda:
         p_net.cuda()
