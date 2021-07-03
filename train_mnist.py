@@ -234,8 +234,9 @@ def mnist_arguments():
                         help='which MNIST datset to train/validate on (default: mnist-rotated-translated)')
 
     parser.add_argument('-z', '--z-dim', type=int, default=2, help='latent variable dimension (default: 2)')
-    parser.add_argument('--hidden-dim', type=int, default=500, help='dimension of hidden layers (default: 512)')
-    parser.add_argument('--num-layers', type=int, default=2, help='number of hidden layers (default: 1)')
+    parser.add_argument('--p-hidden-dim', type=int, default=500, help='dimension of hidden layers (default: 500)')
+    parser.add_argument('--q-hidden-dim', type=int, default=500, help='dimension of hidden layers (default: 500)')
+    parser.add_argument('--num-layers', type=int, default=2, help='number of hidden layers (default: 2)')
     parser.add_argument('-a', '--activation', choices=['tanh', 'relu'], default='tanh',
                         help='activation function (default: tanh)')
 
@@ -338,7 +339,7 @@ def main():
     print('# training with z-dim:', z_dim, file=sys.stderr)
 
     num_layers = args.num_layers
-    hidden_dim = args.hidden_dim
+    hidden_dim = args.p_hidden_dim
 
     # default activation
     activation = nn.LeakyReLU
@@ -368,6 +369,9 @@ def main():
             print('# spatial-VAE with translation inference', file=sys.stderr)
             inf_dim += 2
         p_net = models.SpatialGenerator(z_dim, hidden_dim, n_out=n_out, num_layers=num_layers, activation=activation)
+
+    num_layers = args.num_layers
+    hidden_dim = args.q_hidden_dim
 
     q_net = models.InferenceNetwork(n * m, inf_dim, hidden_dim, num_layers=num_layers, activation=activation)
 
