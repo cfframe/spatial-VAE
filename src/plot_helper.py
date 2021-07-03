@@ -57,7 +57,7 @@ class PlotHelper:
             y_label='KL Divergence',
             train_data=train_arr[:, ResultColumns.KL],
             validation_data=val_arr[:, ResultColumns.KL],
-            legend_location='upper right',
+            legend_location='lower right',
             output_dir=output_dir)
 
         plt.figure()
