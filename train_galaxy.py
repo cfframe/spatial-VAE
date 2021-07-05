@@ -5,7 +5,6 @@ import datetime
 import logging
 import numpy as np
 import os
-import pandas as pd
 import sys
 
 import spatial_vae.models as models
@@ -129,7 +128,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     return elbo, log_p_x_g_z, kl_div, y_hat
 
 
-def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, z_scale=1, use_cuda=False):
+def minibatch_for_display(x, y, q_net, p_net, rotate=True, translate=True, z_scale=1, use_cuda=False):
     batch_size = y.size(0)
     channels = y.size(2)
     x = x.expand(batch_size, x.size(0), x.size(1))
@@ -154,6 +153,26 @@ def minibatch_for_display(x, y, p_net, q_net, rotate=True, translate=True, z_sca
     if translate:
         # z[0, 1] are the translations, so clear these
         z = z[:, 2:]
+
+    z = z * z_scale
+
+    # reconstruct
+    y_hat = p_net(x.contiguous(), z)
+    y_hat = y_hat.view(batch_size, -1, channels)
+
+    return y_hat
+
+
+def random_minibatch_generator(x, y, p_net, z_dim, z_scale=1, use_cuda=False):
+    batch_size = y.size(0)
+    channels = y.size(2)
+    x = x.expand(batch_size, x.size(0), x.size(1))
+
+    if use_cuda:
+        y = y.cuda()
+
+    # draw samples from normal
+    z = Variable(x.data.new(batch_size, z_dim).normal_())
 
     z = z * z_scale
 
@@ -213,7 +232,7 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
     return elbo_accum, bce_loss_accum, kl_loss_accum
 
 
-def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
+def eval_model(iterator, x_coord, p_net, q_net, z_dim, rotate=True, translate=True,
                dx_scale=0.1, theta_prior=np.pi, z_scale=1, use_cuda=False,
                to_save_image_samples=False,
                image_dims=None, epoch='0',
@@ -254,8 +273,11 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
 
         # Reconstruct and save images in first batch of each epoch, as a sample
         if iteration_count == 0 and to_save_image_samples and image_dims:
-            y_display = minibatch_for_display(x, y, p_net, q_net, rotate=rotate, translate=translate,
+            y_display = minibatch_for_display(x, y, q_net, p_net, rotate=rotate, translate=translate,
                                               z_scale=z_scale, use_cuda=use_cuda)
+
+            y_random = random_minibatch_generator(x, y, p_net, z_dim,
+                                                  z_scale=z_scale, use_cuda=use_cuda)
 
             MiscTools.export_batch_as_image(data=y_display,
                                             output='{}/images/{}_dis_{}.png'.format(output_dir, epoch, save_label),
@@ -263,6 +285,10 @@ def eval_model(iterator, x_coord, p_net, q_net, rotate=True, translate=True,
 
             MiscTools.export_batch_as_image(data=y_hat,
                                             output='{}/images/{}_{}.png'.format(output_dir, epoch, save_label),
+                                            image_dims=image_dims, to_permute_for_channels=True)
+
+            MiscTools.export_batch_as_image(data=y_random,
+                                            output='{}/images/{}_rnd_{}.png'.format(output_dir, epoch, save_label),
                                             image_dims=image_dims, to_permute_for_channels=True)
 
     return elbo_accum, bce_loss_accum, kl_loss_accum
@@ -490,8 +516,9 @@ def main():
 
         # evaluate on the validation set
         to_save_image_samples = ((epoch + 1) % save_interval == 0)
-        elbo_accum, bce_loss_accum, kl_loss_accum = eval_model(val_iterator, x_coord, p_net,
-                                                               q_net, rotate=rotate, translate=translate,
+        elbo_accum, bce_loss_accum, kl_loss_accum = eval_model(val_iterator, x_coord, p_net, q_net,
+                                                               z_dim=z_dim,
+                                                               rotate=rotate, translate=translate,
                                                                dx_scale=dx_scale, theta_prior=theta_prior,
                                                                z_scale=z_scale,
                                                                use_cuda=use_cuda,
