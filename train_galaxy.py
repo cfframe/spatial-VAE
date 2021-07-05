@@ -317,7 +317,8 @@ def galaxy_arguments():
     parser.add_argument('--q-num-layers', type=int, default=2, help='number of hidden layers (default: 2)')
     parser.add_argument('-a', '--activation', choices=['tanh', 'relu'], default='tanh',
                         help='activation function (default: tanh)')
-
+    parser.add_argument('--softplus', action='store_true',
+                        help='apply softplus activation to mean pixel output by generator. clamping the mean to be non-negative can reduce learning background noise')
     parser.add_argument('--vanilla', action='store_true',
                         help='use the standard MLP generator architecture, decoding each pixel with an independent function. disables structured rotation and translation inference')
     parser.add_argument('--no-rotate', action='store_true', help='do not perform rotation inference')
@@ -425,11 +426,14 @@ def main():
     elif args.activation == 'relu':
         activation = nn.LeakyReLU
 
+    softplus = args.softplus
+
     # Build models
     if args.vanilla:
         print('# using the vanilla MLP generator architecture', file=sys.stderr)
         n_out = channels * image_rows * image_cols
-        p_net = models.VanillaGenerator(n_out, z_dim, hidden_dim, num_layers=num_layers, activation=activation)
+        p_net = models.VanillaGenerator(n_out, z_dim, hidden_dim, num_layers=num_layers,
+                                        activation=activation, softplus=softplus)
         inf_dim = z_dim
         rotate = False
         translate = False
@@ -445,7 +449,8 @@ def main():
         if translate:
             print('# spatial-VAE with translation inference', file=sys.stderr)
             inf_dim += 2
-        p_net = models.SpatialGenerator(z_dim, hidden_dim, n_out=n_out, num_layers=num_layers, activation=activation)
+        p_net = models.SpatialGenerator(z_dim, hidden_dim, n_out=n_out, num_layers=num_layers,
+                                        activation=activation, softplus=softplus)
 
     num_layers = args.q_num_layers
     hidden_dim = args.q_hidden_dim
