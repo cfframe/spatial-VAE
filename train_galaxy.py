@@ -18,6 +18,7 @@ import torch.utils.data
 from pathlib import Path
 from PIL import Image
 from src.file_tools import FileTools
+from src.logging_levels import LoggingLevels
 from src.misc_tools import MiscTools
 from src.plot_helper import PlotHelper
 from src.result_columns import ResultColumns
@@ -347,6 +348,8 @@ def galaxy_arguments():
                         help='% split of training images for validation instead of training (default: 50)')
     parser.add_argument('--make-mono', action='store_true',
                         help='convert rbg images to monochrome')
+    parser.add_argument('--logging-level', type=str, default='INFO',
+                        help='logging level (default: INFO')
 
     return parser.parse_args()
 
@@ -357,6 +360,14 @@ def main():
 
     start_time, output_dir, trained_dir, images_dir, num_epochs, num_train_images, val_split, digits \
         = MiscTools.prep_pre_load_images(dataset_type, args)
+
+    logging_level = LoggingLevels.logging_level(args.logging_level)
+
+    logging.basicConfig(filename=f'{output_dir}/galaxy.log', format='%(asctime)s %(levelname)s:%(message)s',
+                        datefmt='%Y%m%d %H:%M:%S', filemode='w',
+                        level=logging_level)
+    logger = logging.getLogger()
+    LoggingLevels.print_and_log_info(logger, 'Started')
 
     # load the images
     print('# loading data...', file=sys.stderr)
@@ -402,7 +413,9 @@ def main():
     use_cuda = (device != -1) and torch.cuda.is_available()
     if device >= 0:
         torch.cuda.set_device(device)
-        print('# using CUDA device:', device, file=sys.stderr)
+        LoggingLevels.print_and_log_info(logger, f'# using CUDA device: {device}')
+    else:
+        LoggingLevels.print_and_log_info(logger, f'# using CPU')
 
     augment_rotation = args.augment_rotation
     if use_cuda:
@@ -550,21 +563,20 @@ def main():
                            train_results=train_results_for_file,
                            val_results=val_results_for_file)
 
-    # Create archive of output directory
-    FileTools.make_datetime_named_archive(output_dir, 'zip', output_dir)
-
     end_time = datetime.datetime.now()
     print(f"End : {end_time.strftime('%y%m%d_%H%M%S')}")
 
     elapsed_time = (end_time - start_time)
-    print(f"Elapsed time: {elapsed_time}")
+    LoggingLevels.print_and_log_info(logger, f'Elapsed time: {elapsed_time}')
+    LoggingLevels.print_and_log_info(logger, f'Finished')
+
+    for hndlr in logger.handlers:
+        hndlr.flush()
+        hndlr.close()
+
+    # Create archive of output directory - INCLUDING log
+    FileTools.make_datetime_named_archive(output_dir, 'zip', output_dir)
 
 
 if __name__ == '__main__':
-    Path('logs').mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(filename='galaxy.log', format='%(asctime)s %(levelname)s:%(message)s',
-                        datefmt='%Y%m%d %H:%M:%S', filemode='w', level=logging.DEBUG)
-    logging.info('Started')
     main()
-    logging.info('Finished')
-
