@@ -373,6 +373,8 @@ def galaxy_arguments():
                         help='logging level (default: INFO')
     parser.add_argument('-da', '--display-activation', choices=['sigmoid', 'softmax'], default='sigmoid',
                         help='activation used for image display purposes')
+    parser.add_argument('--invert_colours', action='store_true',
+                        help='convert images to negatives')
 
     return parser.parse_args()
 
@@ -420,6 +422,9 @@ def main():
 
     images_train = torch.from_numpy(images_train).float() / 255
     images_val = torch.from_numpy(images_val).float() / 255
+    if args.invert_colours:
+        images_train = 1 - images_train
+        images_val = 1 - images_val
 
     y_train = images_train.view(-1, image_rows * image_cols, channels)
     y_val = images_val.view(-1, image_rows * image_cols, channels)
