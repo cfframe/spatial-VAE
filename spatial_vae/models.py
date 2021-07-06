@@ -62,13 +62,6 @@ class SpatialGenerator(nn.Module):
         self.softplus = softplus
         self.expand_coords = expand_coords
 
-        # May have noise channel, don't want to apply softplus to that
-        self.softplus_channels = 1
-        if n_out == 1 or n_out == 2:
-            self.softplus_channels = 1
-        elif n_out == 3:
-            self.softplus_channels = 3
-
         in_dim = 2
         if expand_coords:
             in_dim = 5  # include squares of coordinates as inputs
@@ -132,8 +125,8 @@ class SpatialGenerator(nn.Module):
         y = self.layers(h)  # (batch*num_coords, n_out)
         y = y.view(b, n, -1)
 
-        if self.softplus:  # only apply softplus to image channels
-            y = torch.cat([F.softplus(y[:, :, :self.softplus_channels]), y[:, :, self.softplus_channels:]], 2)
+        if self.softplus:  # only apply softplus to first output
+            y = torch.cat([F.softplus(y[:, :, :1]), y[:, :, 1:]], 2)
 
         return y
 
@@ -148,14 +141,6 @@ class VanillaGenerator(nn.Module):
 
         self.n_out = n_out
         self.softplus = softplus
-
-        # May have noise channel, don't want to apply softplus to that
-        self.softplus_channels = 1
-        if n_out == 1 or n_out == 2:
-            self.softplus_channels = 1
-        elif n_out == 3:
-            self.softplus_channels = 3
-
 
         layers = [nn.Linear(latent_dim, hidden_dim),
                   activation()]
@@ -179,8 +164,8 @@ class VanillaGenerator(nn.Module):
         # ignores x, decodes each pixel conditioned on z
 
         y = self.layers(z).view(z.size(0), -1, self.n_out)
-        if self.softplus:  # only apply softplus to image channels
-            y = torch.cat([F.softplus(y[:, :, :self.softplus_channels]), y[:, :, self.softplus_channels:]], 2)
+        if self.softplus:  # only apply softplus to first output
+            y = torch.cat([F.softplus(y[:, :, :1]), y[:, :, 1:]], 2)
 
         return y
 

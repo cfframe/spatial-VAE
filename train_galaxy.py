@@ -26,7 +26,8 @@ from torch.autograd import Variable
 
 
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
-                   augment_rotation=False, z_scale=1, use_cuda=False):
+                   augment_rotation=False, z_scale=1, use_cuda=False,
+                   display_activation='sigmoid'):
     batch_size = y.size(0)
     channels = y.size(2)
     x = x.expand(batch_size, x.size(0), x.size(1))
@@ -126,10 +127,13 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
     elbo = log_p_x_g_z - kl_div
 
+    y_hat = activate_y_for_display(y_hat, display_activation, channels)
+
     return elbo, log_p_x_g_z, kl_div, y_hat
 
 
-def minibatch_for_display(x, y, q_net, p_net, rotate=True, translate=True, z_scale=1, use_cuda=False):
+def minibatch_for_display(x, y, q_net, p_net, rotate=True, translate=True, z_scale=1, use_cuda=False,
+                          display_activation='sigmoid'):
     batch_size = y.size(0)
     channels = y.size(2)
     x = x.expand(batch_size, x.size(0), x.size(1))
@@ -161,10 +165,13 @@ def minibatch_for_display(x, y, q_net, p_net, rotate=True, translate=True, z_sca
     y_hat = p_net(x.contiguous(), z)
     y_hat = y_hat.view(batch_size, -1, channels)
 
+    y_hat = activate_y_for_display(y_hat, display_activation, channels)
+
     return y_hat
 
 
-def random_minibatch_generator(x, y, p_net, z_dim, z_scale=1, use_cuda=False):
+def random_minibatch_generator(x, y, p_net, z_dim, z_scale=1, use_cuda=False,
+                               display_activation='sigmoid'):
     batch_size = y.size(0)
     channels = y.size(2)
     x = x.expand(batch_size, x.size(0), x.size(1))
@@ -181,7 +188,19 @@ def random_minibatch_generator(x, y, p_net, z_dim, z_scale=1, use_cuda=False):
     y_hat = p_net(x.contiguous(), z)
     y_hat = y_hat.view(batch_size, -1, channels)
 
+    y_hat = activate_y_for_display(y_hat, display_activation, channels)
+
     return y_hat
+
+
+def activate_y_for_display(y, display_activation, channels):
+
+    if display_activation == 'sigmoid':
+        y = torch.sigmoid(y)
+    else:
+        y = F.softmax(y, dim=channels - 1)
+
+    return y
 
 
 def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True,
@@ -200,7 +219,7 @@ def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=T
         x = Variable(x_coord)
         y = Variable(y)
 
-        elbo, log_p_x_g_z, kl_div, _ = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
+        elbo, log_p_x_g_z, kl_div, __ = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
                                                       dx_scale=dx_scale, theta_prior=theta_prior,
                                                       augment_rotation=augment_rotation, z_scale=z_scale,
                                                       use_cuda=use_cuda)
@@ -238,7 +257,8 @@ def eval_model(iterator, x_coord, p_net, q_net, z_dim, rotate=True, translate=Tr
                to_save_image_samples=False,
                image_dims=None, epoch='0',
                output_dir='outputs',
-               save_label=''):
+               save_label='',
+               display_activation='sigmoid'):
     p_net.eval()
     q_net.eval()
 
@@ -256,7 +276,8 @@ def eval_model(iterator, x_coord, p_net, q_net, z_dim, rotate=True, translate=Tr
 
         elbo, log_p_x_g_z, kl_div, y_hat = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
                                                           dx_scale=dx_scale, theta_prior=theta_prior,
-                                                          z_scale=z_scale, use_cuda=use_cuda)
+                                                          z_scale=z_scale, use_cuda=use_cuda,
+                                                          display_activation=display_activation)
 
         elbo = elbo.item()
         gen_loss = -log_p_x_g_z.item()
@@ -275,10 +296,12 @@ def eval_model(iterator, x_coord, p_net, q_net, z_dim, rotate=True, translate=Tr
         # Reconstruct and save images in first batch of each epoch, as a sample
         if iteration_count == 0 and to_save_image_samples and image_dims:
             y_display = minibatch_for_display(x, y, q_net, p_net, rotate=rotate, translate=translate,
-                                              z_scale=z_scale, use_cuda=use_cuda)
+                                              z_scale=z_scale, use_cuda=use_cuda,
+                                              display_activation=display_activation)
 
             y_random = random_minibatch_generator(x, y, p_net, z_dim,
-                                                  z_scale=z_scale, use_cuda=use_cuda)
+                                                  z_scale=z_scale, use_cuda=use_cuda,
+                                                  display_activation=display_activation)
 
             MiscTools.export_batch_as_image(data=y_display,
                                             output='{}/images/{}_dis_{}.png'.format(output_dir, epoch, save_label),
@@ -299,7 +322,7 @@ def load_images(path):
     if path.endswith('mrc') or path.endswith('mrcs'):
         with open(path, 'rb') as f:
             content = f.read()
-        images, _, _ = mrc.parse(content)
+        images, __, __ = mrc.parse(content)
     elif path.endswith('npy'):
         images = np.load(path)
     return images
@@ -318,8 +341,6 @@ def galaxy_arguments():
     parser.add_argument('--q-num-layers', type=int, default=2, help='number of hidden layers (default: 2)')
     parser.add_argument('-a', '--activation', choices=['tanh', 'relu'], default='tanh',
                         help='activation function (default: tanh)')
-    parser.add_argument('--softplus', action='store_true',
-                        help='apply softplus activation to mean pixel output by generator. clamping the mean to be non-negative can reduce learning background noise')
     parser.add_argument('--vanilla', action='store_true',
                         help='use the standard MLP generator architecture, decoding each pixel with an independent function. disables structured rotation and translation inference')
     parser.add_argument('--no-rotate', action='store_true', help='do not perform rotation inference')
@@ -350,6 +371,8 @@ def galaxy_arguments():
                         help='convert rbg images to monochrome')
     parser.add_argument('--logging-level', type=str, default='INFO',
                         help='logging level (default: INFO')
+    parser.add_argument('-da', '--display-activation', choices=['sigmoid', 'softmax'], default='sigmoid',
+                        help='activation used for image display purposes')
 
     return parser.parse_args()
 
@@ -439,14 +462,15 @@ def main():
     elif args.activation == 'relu':
         activation = nn.LeakyReLU
 
-    softplus = args.softplus
+    # display activation
+    display_activation = args.display_activation
 
     # Build models
     if args.vanilla:
         print('# using the vanilla MLP generator architecture', file=sys.stderr)
         n_out = channels * image_rows * image_cols
         p_net = models.VanillaGenerator(n_out, z_dim, hidden_dim, num_layers=num_layers,
-                                        activation=activation, softplus=softplus)
+                                        activation=activation)
         inf_dim = z_dim
         rotate = False
         translate = False
@@ -463,7 +487,7 @@ def main():
             print('# spatial-VAE with translation inference', file=sys.stderr)
             inf_dim += 2
         p_net = models.SpatialGenerator(z_dim, hidden_dim, n_out=n_out, num_layers=num_layers,
-                                        activation=activation, softplus=softplus)
+                                        activation=activation)
 
     num_layers = args.q_num_layers
     hidden_dim = args.q_hidden_dim
@@ -543,7 +567,8 @@ def main():
                                                                to_save_image_samples=to_save_image_samples,
                                                                image_dims=image_dims,
                                                                epoch=epoch_str, output_dir=output_dir,
-                                                               save_label=save_label
+                                                               save_label=save_label,
+                                                               display_activation=display_activation
                                                                )
 
         val_loss = [epoch, elbo_accum, bce_loss_accum, kl_loss_accum]
