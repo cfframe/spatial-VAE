@@ -381,10 +381,9 @@ def galaxy_arguments():
 
 def main():
     args = galaxy_arguments()
-    dataset_type = 'galaxy'
 
     start_time, output_dir, trained_dir, images_dir, num_epochs, num_train_images, val_split, digits \
-        = MiscTools.prep_pre_load_images(dataset_type, args)
+        = MiscTools.prep_pre_load_images(args)
 
     logging_level = LoggingLevels.logging_level(args.logging_level)
 

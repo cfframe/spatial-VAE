@@ -267,10 +267,9 @@ def mnist_arguments():
 
 def main():
     args = mnist_arguments()
-    dataset_type = 'mnist'
 
     start_time, output_dir, trained_dir, images_dir, num_epochs, num_train_images, val_split, digits \
-        = MiscTools.prep_pre_load_images(dataset_type, args)
+        = MiscTools.prep_pre_load_images(args)
 
     # load the images
     if args.dataset == 'mnist':

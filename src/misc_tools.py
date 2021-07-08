@@ -46,7 +46,7 @@ class MiscTools:
             return
 
     @staticmethod
-    def prep_pre_load_images(dataset_type, args):
+    def prep_pre_load_images(args):
         # Final warning
         if input('WARNING Will clear the outputs directory if it exists. Continue (y/n and Enter)?').lower() == 'n':
             quit()
@@ -54,7 +54,7 @@ class MiscTools:
         start_time = datetime.datetime.now()
         print(f"Start : {start_time.strftime('%y%m%d_%H%M%S')}")
 
-        output_dir = 'outputs_{}'.format(dataset_type)
+        output_dir = 'outputs_{}'.format(args.save_prefix)
 
         trained_dir = os.path.join(output_dir, 'trained')
         images_dir = os.path.join(output_dir, 'images')
