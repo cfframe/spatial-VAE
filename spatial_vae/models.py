@@ -82,7 +82,7 @@ class SpatialGenerator(nn.Module):
                 layers.append(nn.Linear(hidden_dim, hidden_dim))
                 layers.append(activation())
         layers.append(nn.Linear(hidden_dim, n_out))
-
+        layers.append(nn.Sigmoid)
         self.layers = nn.Sequential(*layers)
         print(self)
 
