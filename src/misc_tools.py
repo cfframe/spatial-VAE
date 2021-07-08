@@ -111,22 +111,3 @@ class MiscTools:
             for model in models:
                 print(model, file=file)
 
-    @staticmethod
-    def normalize_dataset_by_item(dataset, item_dimensions):
-        flattened_dims = np.prod(item_dimensions)
-        mu = dataset.reshape(-1, flattened_dims).mean(1)
-        std = dataset.reshape(-1, flattened_dims).std(1)
-        dataset = (dataset - mu[:, np.newaxis, np.newaxis]) / std[:, np.newaxis, np.newaxis]
-
-        return dataset
-
-    # NOT FINISHED
-    @staticmethod
-    def normalize_dataset_by_whole(dataset, item_dimensions, channels):
-        flattened_dims = np.prod(item_dimensions)
-        mu = dataset.reshape(-1, flattened_dims).mean(1)
-        std = dataset.reshape(-1, flattened_dims).std(1)
-        dataset = (dataset - mu[:, np.newaxis, np.newaxis]) / std[:, np.newaxis, np.newaxis]
-
-        return dataset
-

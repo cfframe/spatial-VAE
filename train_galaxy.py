@@ -339,7 +339,7 @@ def galaxy_arguments():
     parser.add_argument('--p-num-layers', type=int, default=2, help='number of hidden layers (default: 2)')
     parser.add_argument('--q-hidden-dim', type=int, default=5000, help='dimension of hidden layers (default: 5000)')
     parser.add_argument('--q-num-layers', type=int, default=2, help='number of hidden layers (default: 2)')
-    parser.add_argument('-a', '--activation', choices=['tanh', 'relu', 'leakyrelu'], default='tanh',
+    parser.add_argument('-a', '--activation', choices=['tanh', 'relu'], default='tanh',
                         help='activation function (default: tanh)')
     parser.add_argument('--vanilla', action='store_true',
                         help='use the standard MLP generator architecture, decoding each pixel with an independent function. disables structured rotation and translation inference')
@@ -461,13 +461,11 @@ def main():
     hidden_dim = args.p_hidden_dim
 
     # default activation
-    activation = nn.Tanh
+    activation = nn.LeakyReLU
     if args.activation == 'tanh':
         activation = nn.Tanh
-    elif args.activation == 'leakrelu':
-        activation = nn.LeakyReLU
     elif args.activation == 'relu':
-        activation = nn.ReLU
+        activation = nn.LeakyReLU
 
     # display activation
     display_activation = args.display_activation
