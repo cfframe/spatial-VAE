@@ -17,17 +17,14 @@ class DownloadHelper:
 
         Keyword arguments:
         :param target_path: str -- target file path for prospective download
-        :param replace_download: str -- flag for whether to replace file if already exists
+        :param replace_download: bool -- flag for whether to replace file if already exists
         """
 
         if Path(target_path).is_file():
-            if not replace_download:
+            if replace_download is None:
                 replace_download = input('File {} exists, replace it (y/n and enter)?'.format(target_path))[0].lower()
-
-            if not replace_download == 'y':
-                result = False
-            else:
-                result = True
+                replace_download = True if replace_download == 'y' else False
+            result = replace_download
             message = 'Overwriting "{}".'.format(target_path) if result else 'Not replacing "{}".'.format(target_path)
         else:
             message = 'Saving new file "{}".'.format(target_path)
@@ -39,26 +36,22 @@ class DownloadHelper:
     @staticmethod
     def can_extract_to_extraction_dir(
             unzip_dir: str,
-            replace_content: str = 'n') -> bool:
+            replace_content: bool = False) -> bool:
         """Determine whether or not should be able to extract content from an archive file
 
         Keyword arguments:
         :param unzip_dir: final directory for extracted files
         :param replace_content: flag - replace content of directory
         """
-        replace_content = replace_content.lower()
-
         if unzip_dir and Path(unzip_dir).is_dir() and len(os.listdir(unzip_dir)) > 0:
 
             # This bit gets missed in unit test
-            if not replace_content:
+            if replace_content is None:
                 replace_content = \
                     input('Files exist in {}, replace them (y/n and enter)?'.format(unzip_dir))[0].lower()
 
-            if not replace_content == 'y':
-                result = False
-            else:
-                result = True
+            result = replace_content
+
             message = 'Will replace {}.'.format(unzip_dir) if result \
                 else 'Will not replace content of "{}".'.format(unzip_dir)
         else:
@@ -76,7 +69,7 @@ class DownloadHelper:
         """Determine whether or not to download file
 
         Keyword arguments:
-        
+
         :param target_path: target file path for prospective download
         :param replace_download: flag - replace file if already exists
         :param extraction_dir: final directory for extracted files
@@ -120,43 +113,83 @@ class DownloadHelper:
         """
         filename = filename.lower()
         extraction_dir_path = 'extracted'
-        suffices = ('zip', 'tar', 'gz')
+        suffices = ('.zip', '.tar', '.tar.gz')
+
+        p = Path(filename)
+        file_stem = p.stem
+        suffix_found = False
 
         for suffix in suffices:
-            p = Path(filename)
-            file_stem = p.stem
-            if p.suffix == '.gz':
+            if p.name.endswith('.tar.gz'):
+                # Numpy archive
                 file_stem = Path(file_stem).stem
-            extraction_dir_path = os.path.join(data_dir, file_stem)
+                suffix_found = True
+                break
+            elif suffix == p.suffix:
+                suffix_found = True
+                break
+
+        extraction_dir_path = os.path.join(data_dir, file_stem)
+
+        if not suffix_found:
+            raise ValueError(f'{p.name} is not a handled archive type.')
 
         return extraction_dir_path
 
     @staticmethod
-    def download_dataset(data_dir: str, replace_download: str, replace_unzip_content: str, src_url: str):
+    def get_extraction_isic_dir_path(data_dir: str, filename: str) -> str:
+        """Derive extraction directory
+
+        :param data_dir: Root data directory
+        :param filename: Source filename
+        :returns: str
+        """
+        filename = filename.lower()
+        extraction_dir_path = ''
+        file_types = ('training_input', 'training_groundtruth',
+                      'validation_input', 'validation_groundtruth',
+                      'test_input')
+        suffices = ('zip', 'tar')
+
+        for file_type in file_types:
+            for suffix in suffices:
+                if filename.endswith(file_type + '.' + suffix):
+                    p = Path(file_type)
+                    extraction_dir_path = os.path.join(data_dir, p.stem)
+
+        return extraction_dir_path
+
+    @staticmethod
+    def download_dataset(data_dir: str, replace_download: str, replace_unzip_content: str, src_url: str, is_isic: bool,
+                         working_dir: str = ''):
         """Download file from give URL to given directory with chosen name
 
         Keyword arguments:
 
         :param data_dir: Target root data directory
-        :param replace_download: y/n flag, whether to replace an existing download of same name
-        :param replace_unzip_content: y/n flag, whether to replace existing extraction content
+        :param replace_download: flag, whether to replace an existing download of same name
+        :param replace_unzip_content: flag, whether to replace existing extraction content
         :param src_url: Source URL
+        :param is_isic: flag, whether to be processed as an ISIC file that follows ISIC conventions
+        :param working_dir: (optional) working directory for extraction of download
         """
-        print('Parameters: \ndata_dir: {}\nreplace_download: {}\nreplace_unzip_content: {}\nsrc_url: {}'.format(
-            data_dir, replace_download, replace_unzip_content, src_url))
-        replace_download = replace_download.lower()
-        replace_unzip_content = replace_unzip_content.lower()
+        print('Parameters: \ndata_dir: {}\nreplace_download: {}\nreplace_unzip_content: {}\nsrc_url: {}\nis_isic: {}\n'
+              'working_dir: {}'.
+              format(data_dir, replace_download, replace_unzip_content, src_url, is_isic, working_dir))
 
         src_path = Path(src_url)
         target_filename = src_path.name
-        archive_type = src_path.suffix
+        file_type = src_path.suffix
         if target_filename.endswith('.tar.gz'):
-            archive_type = '.tar.gz'
+            file_type = '.tar.gz'
 
         download_dir = os.path.join(data_dir, 'downloads')
 
         download_file = os.path.join(download_dir, target_filename)
-        final_extraction_dir = DownloadHelper.get_extraction_dir_path(data_dir=data_dir, filename=target_filename)
+        working_dir = data_dir if working_dir == '' else os.path.join(data_dir, working_dir)
+        final_extraction_dir = \
+            DownloadHelper.get_extraction_isic_dir_path(data_dir=working_dir, filename=target_filename) if is_isic \
+            else DownloadHelper.get_extraction_dir_path(data_dir=working_dir, filename=target_filename)
 
         # Remove temp dir if exists, will recreate later if needed
         temp_extraction_dir = os.path.join(data_dir, 'temp')
@@ -165,8 +198,8 @@ class DownloadHelper:
             shutil.rmtree(temp_extraction_dir)
 
         # No need to download when any one of these:
-        # - download file already exists and replace_download == 'n'
-        # - unzip dir already exists with files and replace_content == 'n'
+        # - download file already exists and replace_download == False
+        # - unzip dir already exists with files and replace_content == False
         to_download, can_extract_to_extraction_dir = DownloadHelper.to_download(
             target_path=download_file, replace_download=replace_download,
             extraction_dir=final_extraction_dir, replace_content=replace_unzip_content)
@@ -177,30 +210,29 @@ class DownloadHelper:
         initial_extraction_dir_name = ''
         if can_extract_to_extraction_dir:
             Path(temp_extraction_dir).mkdir(parents=True, exist_ok=True)
-            if archive_type == '.tar.gz':
+            if file_type == '.tar.gz':
                 tar_ref = tarfile.open(download_file, 'r|gz')
                 print(f'Extracting {download_file} to {temp_extraction_dir}')
                 tar_ref.extractall(path=temp_extraction_dir)
                 # Assume that everything is inside a single top level folder.
                 initial_extraction_dir_name = Path(tar_ref.members[0].name).parts[0]
                 tar_ref.close()
-            elif archive_type == '.gz':
+            elif file_type == '.gz':
                 pass
-            elif archive_type == '.tar' or archive_type == 'zip':
+            elif file_type == '.tar' or file_type == '.zip':
                 with zipfile.ZipFile(download_file, 'r') as zip_ref:
                     print(f'Extracting {zip_ref.filename} to {temp_extraction_dir}')
                     zip_ref.extractall(path=temp_extraction_dir)
                     # Assume that everything is inside a single top level folder.
                     initial_extraction_dir_name = Path(zip_ref.filelist[0].filename).parts[0]
 
-
-            # os.remove(download_file)
-
-            # source_dir = os.path.join(data_dir, initial_extraction_dir_name)
             # Remove target dir then rename/move unzipped dir
             if Path(final_extraction_dir).exists():
                 print('Removing dir tree {}'.format(final_extraction_dir))
                 shutil.rmtree(final_extraction_dir)
             extraction_dir = os.path.join(temp_extraction_dir, initial_extraction_dir_name)
             print(f'Moving dir "{extraction_dir}" to "{final_extraction_dir}"')
+            Path(Path(final_extraction_dir).parent).mkdir(parents=True, exist_ok=True)
             os.rename(extraction_dir, final_extraction_dir)
+
+        return final_extraction_dir, working_dir
