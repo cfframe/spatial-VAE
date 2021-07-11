@@ -207,7 +207,7 @@ class FileTools:
 
         with open(save_path, 'w', encoding='utf-8') as outfile:
             outfile.write(content)
-            print('Output saved to {}.'.format(save_path))
+            print('Command arguments saved to {}.'.format(save_path))
 
     @staticmethod
     def save_numpy_image_array_of_images_dir(src_dir: str, target_path: str, new_shape: tuple, suffix: str):
