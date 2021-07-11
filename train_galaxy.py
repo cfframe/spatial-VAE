@@ -26,8 +26,7 @@ from torch.autograd import Variable
 
 
 def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1, theta_prior=np.pi,
-                   augment_rotation=False, z_scale=1, use_cuda=False,
-                   display_activation='sigmoid'):
+                   augment_rotation=False, z_scale=1, use_cuda=False):
     batch_size = y.size(0)
     channels = y.size(2)
     x = x.expand(batch_size, x.size(0), x.size(1))
@@ -118,7 +117,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     y_hat = y_hat.view(batch_size, -1, channels)
 
     size = y.size(1) * channels
-    log_p_x_g_z = -F.binary_cross_entropy_with_logits(y_hat, y) * size
+    log_p_x_g_z = -F.binary_cross_entropy(y_hat, y) * size
 
     # unit normal prior over z and translation
     z_kl = -z_logstd + 0.5 * z_std ** 2 + 0.5 * z_mu ** 2 - 0.5
@@ -127,13 +126,10 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
 
     elbo = log_p_x_g_z - kl_div
 
-    y_hat = activate_y_for_display(y_hat, display_activation, channels)
-
     return elbo, log_p_x_g_z, kl_div, y_hat
 
 
-def minibatch_for_display(x, y, q_net, p_net, rotate=True, translate=True, z_scale=1, use_cuda=False,
-                          display_activation='sigmoid'):
+def minibatch_for_display(x, y, q_net, p_net, rotate=True, translate=True, z_scale=1, use_cuda=False):
     batch_size = y.size(0)
     channels = y.size(2)
     x = x.expand(batch_size, x.size(0), x.size(1))
@@ -165,13 +161,10 @@ def minibatch_for_display(x, y, q_net, p_net, rotate=True, translate=True, z_sca
     y_hat = p_net(x.contiguous(), z)
     y_hat = y_hat.view(batch_size, -1, channels)
 
-    y_hat = activate_y_for_display(y_hat, display_activation, channels)
-
     return y_hat
 
 
-def random_minibatch_generator(x, y, p_net, z_dim, z_scale=1, use_cuda=False,
-                               display_activation='sigmoid'):
+def random_minibatch_generator(x, y, p_net, z_dim, z_scale=1, use_cuda=False):
     batch_size = y.size(0)
     channels = y.size(2)
     x = x.expand(batch_size, x.size(0), x.size(1))
@@ -188,19 +181,7 @@ def random_minibatch_generator(x, y, p_net, z_dim, z_scale=1, use_cuda=False,
     y_hat = p_net(x.contiguous(), z)
     y_hat = y_hat.view(batch_size, -1, channels)
 
-    y_hat = activate_y_for_display(y_hat, display_activation, channels)
-
     return y_hat
-
-
-def activate_y_for_display(y, display_activation, channels):
-
-    if display_activation == 'sigmoid':
-        y = torch.sigmoid(y)
-    else:
-        y = F.softmax(y, dim=channels - 1)
-
-    return y
 
 
 def train_epoch(iterator, x_coord, p_net, q_net, optim, rotate=True, translate=True,
@@ -257,8 +238,7 @@ def eval_model(iterator, x_coord, p_net, q_net, z_dim, rotate=True, translate=Tr
                to_save_image_samples=False,
                image_dims=None, epoch='0',
                output_dir='outputs',
-               save_label='',
-               display_activation='sigmoid'):
+               save_label=''):
     p_net.eval()
     q_net.eval()
 
@@ -276,8 +256,7 @@ def eval_model(iterator, x_coord, p_net, q_net, z_dim, rotate=True, translate=Tr
 
         elbo, log_p_x_g_z, kl_div, y_hat = eval_minibatch(x, y, p_net, q_net, rotate=rotate, translate=translate,
                                                           dx_scale=dx_scale, theta_prior=theta_prior,
-                                                          z_scale=z_scale, use_cuda=use_cuda,
-                                                          display_activation=display_activation)
+                                                          z_scale=z_scale, use_cuda=use_cuda)
 
         elbo = elbo.item()
         gen_loss = -log_p_x_g_z.item()
@@ -296,12 +275,10 @@ def eval_model(iterator, x_coord, p_net, q_net, z_dim, rotate=True, translate=Tr
         # Reconstruct and save images in first batch of each epoch, as a sample
         if iteration_count == 0 and to_save_image_samples and image_dims:
             y_display = minibatch_for_display(x, y, q_net, p_net, rotate=rotate, translate=translate,
-                                              z_scale=z_scale, use_cuda=use_cuda,
-                                              display_activation=display_activation)
+                                              z_scale=z_scale, use_cuda=use_cuda)
 
             y_random = random_minibatch_generator(x, y, p_net, z_dim,
-                                                  z_scale=z_scale, use_cuda=use_cuda,
-                                                  display_activation=display_activation)
+                                                  z_scale=z_scale, use_cuda=use_cuda)
 
             MiscTools.export_batch_as_image(data=y_display,
                                             output='{}/images/{}_dis_{}.png'.format(output_dir, epoch, save_label),
@@ -371,8 +348,6 @@ def galaxy_arguments():
                         help='convert rbg images to monochrome')
     parser.add_argument('--logging-level', type=str, default='INFO',
                         help='logging level (default: INFO')
-    parser.add_argument('-da', '--display-activation', choices=['sigmoid', 'softmax'], default='sigmoid',
-                        help='activation used for image display purposes')
     parser.add_argument('--invert_colours', action='store_true',
                         help='convert images to negatives')
 
@@ -387,7 +362,7 @@ def main():
 
     logging_level = LoggingLevels.logging_level(args.logging_level)
 
-    logging.basicConfig(filename=f'{output_dir}/galaxy.log', format='%(asctime)s %(levelname)s:%(message)s',
+    logging.basicConfig(filename=f'{output_dir}/run.log', format='%(asctime)s %(levelname)s:%(message)s',
                         datefmt='%Y%m%d %H:%M:%S', filemode='w',
                         level=logging_level)
     logger = logging.getLogger()
@@ -469,9 +444,6 @@ def main():
     elif args.activation == 'sigmoid':
         activation = nn.Sigmoid
 
-    # display activation
-    display_activation = args.display_activation
-
     # Build models
     if args.vanilla:
         print('# using the vanilla MLP generator architecture', file=sys.stderr)
@@ -498,7 +470,8 @@ def main():
 
     num_layers = args.q_num_layers
     hidden_dim = args.q_hidden_dim
-    q_net = models.InferenceNetwork(channels * image_rows * image_cols, inf_dim, hidden_dim, num_layers=num_layers, activation=activation)
+    q_net = models.InferenceNetwork(channels * image_rows * image_cols, inf_dim, hidden_dim, num_layers=num_layers,
+                                    activation=activation)
 
     if use_cuda:
         p_net.cuda()
@@ -574,8 +547,7 @@ def main():
                                                                to_save_image_samples=to_save_image_samples,
                                                                image_dims=image_dims,
                                                                epoch=epoch_str, output_dir=output_dir,
-                                                               save_label=save_label,
-                                                               display_activation=display_activation
+                                                               save_label=save_label
                                                                )
 
         val_loss = [epoch, elbo_accum, bce_loss_accum, kl_loss_accum]
