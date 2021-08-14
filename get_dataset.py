@@ -5,10 +5,10 @@ Description: This script downloads and unzips (if a zip) files from the given so
 Example usage:
 
 python get_dataset.py --help
-python get_dataset.py -d data -rd n
+python get_dataset.py -d data -rd
 python get_dataset.py -d data -rd y -rt y
-python get_dataset.py -d data -rd n -ruc n -s http://bergerlab-downloads.csail.mit.edu/spatial-vae/mnist_rotated_translated.tar.gz
-python get_dataset.py -d data -rd n -ruc n -s http://bergerlab-downloads.csail.mit.edu/spatial-vae/galaxy_zoo.tar.gz
+python get_dataset.py -d data -rd -ruc -s http://bergerlab-downloads.csail.mit.edu/spatial-vae/mnist_rotated_translated.tar.gz
+python get_dataset.py -d data -rd -ruc -s http://bergerlab-downloads.csail.mit.edu/spatial-vae/galaxy_zoo.tar.gz
 
 Datasets for spatial-VAE
 - [Rotated MNIST](http://bergerlab-downloads.csail.mit.edu/spatial-vae/mnist_rotated.tar.gz)
@@ -59,7 +59,7 @@ def main():
         replace_download=args.replace_download, replace_unzip_content=args.replace_unzip_content,
         src_url=args.src_url, is_isic=args.is_isic, working_dir=args.working_dir)
 
-    result = FileTools.save_numpy_image_array_of_images_dir(
+    result = FileTools.create_numpy_archive_from_images_dir(
         src_dir=extraction_dir, target_path=extraction_dir, new_shape=(64, 64), suffix='.jpg')
 
     print(result)

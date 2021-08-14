@@ -210,7 +210,27 @@ class FileTools:
             print('Command arguments saved to {}.'.format(save_path))
 
     @staticmethod
-    def save_numpy_image_array_of_images_dir(src_dir: str, target_path: str, new_shape: tuple, suffix: str):
+    def create_numpy_archive_from_images_dir(src_dir: str, target_path: str,
+                                             new_shape: tuple = 0,
+                                             suffix: str = '.jpg'):
+        """Create a numpy array archive of images sourced from a single directory.
+
+        If new_shape is not provided, and images are of different dimensions, then this will generate
+        an exception.
+
+        Keyword arguments:
+
+        :param src_dir: path to source directory
+        :param target_path: path to final final, excluding extension
+        :param new_shape: optional, end shape of resized image arrays
+        :param suffix: suffix of images to be processed, including preceding full-stop (default '.jpg')
+        """
+        # Catch items where None passed in
+        if new_shape is None:
+            new_shape = 0
+        if suffix is None:
+            suffix = '.jpg'
+
         if src_dir == '':
             result = f'No source directory supplied for images, so no npy file created.'
         elif not Path(src_dir).is_dir():
@@ -229,13 +249,14 @@ class FileTools:
                     for img in [np.array(Image.open(image_path)) for image_path in image_files]:
                         processed_images.append(
                             np.asarray(
+                                np.asarray(img, dtype='int') if new_shape == 0 else
                                 resize(img, new_shape, preserve_range=True, anti_aliasing=False),
                                 dtype='int'
                             )
                         )
                 except Exception as err:
                     error_message = \
-                        "Unexpected error in FileTools.save_numpy_image_array_of_images_dir\n"\
+                        "Unexpected error in FileTools.create_numpy_archive_from_images_dir\n"\
                         + str(err.args)
                     raise Exception(error_message)
 
