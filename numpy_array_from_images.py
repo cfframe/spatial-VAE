@@ -7,7 +7,8 @@ import argparse
 Optionally resize.
 
 Example usage:
-
+* WARNING * This requires over 30GB RAM for ISIC2018 Challenge Task 3 training images
+* USE AT YOUR OWN RISK *
 python numpy_array_from_images.py -s C:/GitHub/cfframe/spatial-VAE/data/isic2018/training_input -t C:/GitHub/cfframe/spatial-VAE/data/isic2018/train2 
 
 """
@@ -28,6 +29,8 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if input('WARNING May require a lot of memory - e.g. ISIC2018 Challenge Task 3 Training data needs over 30GB. \nContinue (y/n and Enter)?').lower() == 'n':
+        quit()
     for k, v in vars(args).items():
         print(f'{k}={v or ""}')
     src_dir = args.source_dir
