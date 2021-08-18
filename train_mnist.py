@@ -78,7 +78,7 @@ def eval_minibatch(x, y, p_net, q_net, rotate=True, translate=True, dx_scale=0.1
     y_hat = y_hat.view(batch_size, -1)
 
     size = y.size(1)
-    log_p_x_g_z = -F.binary_cross_entropy_with_logits(y_hat, y) * size
+    log_p_x_g_z = -F.binary_cross_entropy(y_hat, y) * size
 
     # unit normal prior over z and translation
     z_kl = -z_logstd + 0.5 * z_std ** 2 + 0.5 * z_mu ** 2 - 0.5
