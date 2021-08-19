@@ -311,42 +311,42 @@ def galaxy_arguments():
     parser.add_argument('train_path', help='path to training data')
     parser.add_argument('test_path', help='path to testing data')
 
-    parser.add_argument('-z', '--z-dim', type=int, default=2, help='latent variable dimension (default: 2)')
-    parser.add_argument('--p-hidden-dim', type=int, default=500, help='dimension of hidden layers (default: 500)')
-    parser.add_argument('--p-num-layers', type=int, default=2, help='number of hidden layers (default: 2)')
-    parser.add_argument('--q-hidden-dim', type=int, default=5000, help='dimension of hidden layers (default: 5000)')
-    parser.add_argument('--q-num-layers', type=int, default=2, help='number of hidden layers (default: 2)')
+    parser.add_argument('-z', '--z_dim', type=int, default=2, help='latent variable dimension (default: 2)')
+    parser.add_argument('--p_hidden_dim', type=int, default=500, help='dimension of hidden layers (default: 500)')
+    parser.add_argument('--p_num_layers', type=int, default=2, help='number of hidden layers (default: 2)')
+    parser.add_argument('--q_hidden_dim', type=int, default=5000, help='dimension of hidden layers (default: 5000)')
+    parser.add_argument('--q_num_layers', type=int, default=2, help='number of hidden layers (default: 2)')
     parser.add_argument('-a', '--activation', choices=['tanh', 'relu', 'leakyrelu', 'sigmoid'], default='tanh',
                         help='activation function (default: tanh)')
     parser.add_argument('--vanilla', action='store_true',
                         help='use the standard MLP generator architecture, decoding each pixel with an independent function. disables structured rotation and translation inference')
-    parser.add_argument('--no-rotate', action='store_true', help='do not perform rotation inference')
-    parser.add_argument('--no-translate', action='store_true', help='do not perform translation inference')
+    parser.add_argument('--no_rotate', action='store_true', help='do not perform rotation inference')
+    parser.add_argument('--no_translate', action='store_true', help='do not perform translation inference')
 
-    parser.add_argument('--dx-scale', type=float, default=0.1,
+    parser.add_argument('--dx_scale', type=float, default=0.1,
                         help='standard deviation of translation latent variables (default: 0.1)')
-    parser.add_argument('--theta-prior', type=float, default=np.pi,
+    parser.add_argument('--theta_prior', type=float, default=np.pi,
                         help='standard deviation on rotation prior (default: pi)')
 
-    parser.add_argument('-l', '--learning-rate', type=float, default=1e-4, help='learning rate (default: 0.0001)')
-    parser.add_argument('--minibatch-size', type=int, default=100, help='minibatch size (default: 100)')
+    parser.add_argument('-l', '--learning_rate', type=float, default=1e-4, help='learning rate (default: 0.0001)')
+    parser.add_argument('--minibatch_size', type=int, default=100, help='minibatch size (default: 100)')
 
-    parser.add_argument('--augment-rotation', action='store_true',
+    parser.add_argument('--augment_rotation', action='store_true',
                         help='use data augmentation by randomly rotating images before inference')
-    parser.add_argument('--z-delay', type=int, default=0,
+    parser.add_argument('--z_delay', type=int, default=0,
                         help='delay using unstructured latent variables for this many training epochs (default: 0)')
 
-    parser.add_argument('--save-prefix', help='path prefix to save models (optional)')
-    parser.add_argument('--save-interval', default=10, type=int, help='save frequency in epochs (default: 10)')
-    parser.add_argument('--num-epochs', type=int, default=100, help='number of training epochs (default: 100)')
+    parser.add_argument('--save_prefix', help='path prefix to save models (optional)')
+    parser.add_argument('--save_interval', default=10, type=int, help='save frequency in epochs (default: 10)')
+    parser.add_argument('--num_epochs', type=int, default=100, help='number of training epochs (default: 100)')
 
     parser.add_argument('-d', '--device', type=int, default=-2, help='compute device to use')
-    parser.add_argument('--num-train-images', type=int, default=0, help='number of training images (default: 0 = all)')
-    parser.add_argument('--val-split', type=int, default=50,
+    parser.add_argument('--num_train_images', type=int, default=0, help='number of training images (default: 0 = all)')
+    parser.add_argument('--val_split', type=int, default=50,
                         help='% split of training images for validation instead of training (default: 50)')
-    parser.add_argument('--make-mono', action='store_true',
+    parser.add_argument('--make_mono', action='store_true',
                         help='convert rbg images to monochrome')
-    parser.add_argument('--logging-level', type=str, default='INFO',
+    parser.add_argument('--logging_level', type=str, default='INFO',
                         help='logging level (default: INFO')
     parser.add_argument('--invert_colours', action='store_true',
                         help='convert images to negatives')
