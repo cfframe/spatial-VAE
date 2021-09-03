@@ -28,19 +28,23 @@ class PlotHelper:
         dataset = dataset[2:]
         half_len = math.ceil(len(dataset) / 2.0)
 
-        # Work out the average slopes of each half
-        y1 = dataset[:half_len]
-        y2 = dataset[-half_len:]
-        x = np.asarray(range(0, half_len))
+        # Dataset is exceptionally small, so just set defaults
+        if half_len <= 1:
+            vertical = 'upper'
+            horizontal = 'center'
 
-        # Algorithm does not accommodate datasets less than 5, so initialise m1 and m2 with values valid for top right
-        m1, m2 = -2, 1
-        if len(dataset) >= 5:
+        else:
+
+            # Work out the average slopes of each half
+            y1 = dataset[:half_len]
+            y2 = dataset[-half_len:]
+            x = np.asarray(range(0, half_len))
+
             m1 = (len(x) * np.sum(x * y1) - np.sum(x) * np.sum(y1)) / (len(x) * np.sum(x * x) - np.sum(x) ** 2)
             m2 = (len(x) * np.sum(x * y2) - np.sum(x) * np.sum(y2)) / (len(x) * np.sum(x * x) - np.sum(x) ** 2)
 
-        vertical = 'upper' if m1 < m2 else 'lower'
-        horizontal = 'right' if abs(m1) > abs(m2) else 'left'
+            vertical = 'upper' if m1 < m2 else 'lower'
+            horizontal = 'right' if abs(m1) > abs(m2) else 'left'
 
         legend_location = f'{vertical} {horizontal}'
 
