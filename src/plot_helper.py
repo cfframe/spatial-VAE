@@ -33,8 +33,11 @@ class PlotHelper:
         y2 = dataset[-half_len:]
         x = np.asarray(range(0, half_len))
 
-        m1 = (len(x) * np.sum(x * y1) - np.sum(x) * np.sum(y1)) / (len(x) * np.sum(x * x) - np.sum(x) ** 2)
-        m2 = (len(x) * np.sum(x * y2) - np.sum(x) * np.sum(y2)) / (len(x) * np.sum(x * x) - np.sum(x) ** 2)
+        # Algorithm does not accommodate datasets less than 5, so initialise m1 and m2 with values valid for top right
+        m1, m2 = -2, 1
+        if len(dataset) >= 5:
+            m1 = (len(x) * np.sum(x * y1) - np.sum(x) * np.sum(y1)) / (len(x) * np.sum(x * x) - np.sum(x) ** 2)
+            m2 = (len(x) * np.sum(x * y2) - np.sum(x) * np.sum(y2)) / (len(x) * np.sum(x * x) - np.sum(x) ** 2)
 
         vertical = 'upper' if m1 < m2 else 'lower'
         horizontal = 'right' if abs(m1) > abs(m2) else 'left'

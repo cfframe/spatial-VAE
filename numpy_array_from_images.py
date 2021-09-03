@@ -15,7 +15,7 @@ python numpy_array_from_images.py -s C:/GitHub/cfframe/spatial-VAE/data/isic2018
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Download the target training dataset')
+    parser = argparse.ArgumentParser(description='Generate a numpy archive from a directory of images')
     parser.add_argument('--source_dir', '-s', type=str, help="Source directory with images")
     parser.add_argument('--target_path', '-t', type=str, help="Base path (no extension) for array to be saved")
     parser.add_argument('--new_shape', '-sh', type=tuple, default=0,

@@ -8,7 +8,6 @@ import os
 import sys
 
 import spatial_vae.models as models
-import spatial_vae.mrc as mrc
 
 import torch
 import torch.nn as nn
@@ -293,16 +292,6 @@ def eval_model(iterator, x_coord, p_net, q_net, z_dim, rotate=True, translate=Tr
                                             image_dims=image_dims, to_permute_for_channels=True)
 
     return elbo_accum, bce_loss_accum, kl_loss_accum
-
-
-def load_images(path):
-    if path.endswith('mrc') or path.endswith('mrcs'):
-        with open(path, 'rb') as f:
-            content = f.read()
-        images, __, __ = mrc.parse(content)
-    elif path.endswith('npy'):
-        images = np.load(path)
-    return images
 
 
 def galaxy_arguments():
